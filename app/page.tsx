@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { MemoryManagement } from '@/components/memory/MemoryManagement'
 import { StatsCard } from '@/components/dashboard/StatsCard'
+import CalendarInterface from '@/components/calendar/CalendarInterface'
 import { getMemoryService } from '@/lib/memory-service'
 import { getChatService } from '@/lib/chat-service'
 import { aiService } from '@/lib/ai-service'
@@ -25,6 +26,7 @@ export default function Home() {
     golemStats: { chainId: 60138453025, totalMemories: 0, totalSize: 0, pinnedMemories: 0 }
   })
   const [lastTransactionUrl, setLastTransactionUrl] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'memories' | 'calendar'>('memories')
 
   const memoryService = getMemoryService()
   const chatService = getChatService()
@@ -74,12 +76,39 @@ export default function Home() {
 
   const loadMemories = async () => {
     try {
+      console.log('🧠 Starting to load memories...')
       const searchResult = await memoryService.searchMemories({
         query: '',
         limit: 20
       })
       console.log('🧠 Loaded memories:', searchResult.memories.length, 'memories')
+      console.log('🧠 Memory data:', searchResult.memories)
       setMemories(searchResult.memories)
+      
+      // If no memories found, create a test memory
+      if (searchResult.memories.length === 0) {
+        console.log('🧠 No memories found, creating a test memory...')
+        try {
+          const testMemory = await memoryService.createMemory({
+            content: 'This is a test memory to verify the system is working',
+            type: 'learned_fact',
+            category: 'test',
+            tags: ['test', 'system'],
+            encrypted: false
+          })
+          console.log('🧠 Test memory created:', testMemory)
+          
+          // Reload memories after creating test memory
+          const newSearchResult = await memoryService.searchMemories({
+            query: '',
+            limit: 20
+          })
+          console.log('🧠 Reloaded memories after test creation:', newSearchResult.memories.length, 'memories')
+          setMemories(newSearchResult.memories)
+        } catch (testError) {
+          console.error('Failed to create test memory:', testError)
+        }
+      }
     } catch (error) {
       console.error('Failed to load memories:', error)
       setMemories([])
@@ -144,31 +173,31 @@ export default function Home() {
       const updatedMessages = [...messages, userMessage, assistantMessage]
       setMessages(updatedMessages)
 
-      // Save chat history to persistent storage (encrypted in Golem Base + anchored on NEAR)
+      // Save chat history to persistent storage (Golem Base only)
       await saveChatHistory(updatedMessages)
       
       // Show transaction URL for chat save
       const chatEntityKey = chatService.getChatEntityKey()
       if (chatEntityKey) {
-        const txUrl = `https://explorer.kaolin.holesky.golemdb.io/entity/${chatEntityKey}`
+        const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+        const txUrl = `${explorerUrl}/entity/${chatEntityKey}`
         setLastTransactionUrl(txUrl)
       }
 
-      // Store conversation in memory (encrypted in Golem Base + anchored on NEAR)
+      // Store conversation in memory (Golem Base only)
       if (storeMemory && aiResponse.shouldStore) {
         console.log('🧠 Storing conversation in encrypted memory...')
-        const memory = await memoryService.createMemory(
-          `User: ${content}\nAssistant: ${aiResponse.content}`,
-          'conversation',
-          'Chat',
-          ['conversation', 'ai-chat'],
-          undefined,
-          true // Encrypt the conversation
-        )
+        const memory = await memoryService.createMemory({
+          content: `User: ${content}\nAssistant: ${aiResponse.content}`,
+          type: 'conversation',
+          category: 'Chat',
+          tags: ['conversation', 'ai-chat'],
+          encrypted: true
+        })
         console.log('✅ Conversation stored with ID:', memory.id)
-        console.log('🔗 NEAR Transaction ID:', memory.nearTransactionId)
         console.log('🗃️ Golem Base Entity Key:', memory.ipfsHash)
-        const txUrl = `https://explorer.kaolin.holesky.golemdb.io/entity/${memory.ipfsHash}`
+        const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+        const txUrl = `${explorerUrl}/entity/${memory.ipfsHash}`
         console.log(`🔗 Transaction URL: ${txUrl}`)
         setLastTransactionUrl(txUrl)
         
@@ -180,9 +209,7 @@ export default function Home() {
       console.error('Failed to send message:', error)
       
       // Show specific error messages based on the error type
-      if (error.message.includes('User must be connected to NEAR wallet')) {
-        toast.error('Please connect your NEAR wallet to continue.')
-      } else if (error.message.includes('API key is required')) {
+      if (error.message.includes('API key is required')) {
         toast.error('OpenAI API key is not configured. Please check your environment variables.')
       } else if (error.message.includes('401')) {
         toast.error('Invalid OpenAI API key. Please check your credentials.')
@@ -239,6 +266,36 @@ export default function Home() {
     }
   }
 
+  const handleGrantPermission = async (memoryId: string, agentId: string, actions: string[]) => {
+    try {
+      const success = await memoryService.grantPermission(memoryId, agentId, actions as ('read' | 'write' | 'delete')[])
+      if (success) {
+        toast.success(`Permission granted to ${agentId}`)
+        loadMemories() // Refresh to show updated permissions
+      } else {
+        toast.error('Failed to grant permission')
+      }
+    } catch (error) {
+      console.error('Failed to grant permission:', error)
+      toast.error('Failed to grant permission')
+    }
+  }
+
+  const handleRevokePermission = async (memoryId: string, agentId: string) => {
+    try {
+      const success = await memoryService.revokePermission(memoryId, agentId)
+      if (success) {
+        toast.success(`Permission revoked from ${agentId}`)
+        loadMemories() // Refresh to show updated permissions
+      } else {
+        toast.error('Failed to revoke permission')
+      }
+    } catch (error) {
+      console.error('Failed to revoke permission:', error)
+      toast.error('Failed to revoke permission')
+    }
+  }
+
 
   const getMemoryTypes = () => {
     const types = new Set(memories.map(m => m.type))
@@ -275,9 +332,9 @@ export default function Home() {
         </div>
       )}
       
-      <main className="flex-1 flex flex-col lg:flex-row gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-hidden">
-        {/* Chat Interface - Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <main className="flex-1 flex flex-col xl:flex-row w-full overflow-hidden">
+        {/* Chat Interface - 60% Width */}
+        <div className="w-full xl:w-3/5 flex flex-col min-w-0 bg-white border-r border-gray-200 overflow-hidden">
           <ChatInterface
             messages={messages}
             onSendMessage={handleSendMessage}
@@ -289,14 +346,31 @@ export default function Home() {
           />
         </div>
 
-        {/* Memory Management - Right Sidebar */}
-        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* Calendar Interface - 20% Width */}
+        <div className="w-full xl:w-1/5 flex-shrink-0 bg-white border-r border-gray-200 overflow-hidden">
+          <CalendarInterface
+            onEventCreate={(event) => {
+              console.log('Event created:', event);
+            }}
+            onEventUpdate={(eventId, event) => {
+              console.log('Event updated:', eventId, event);
+            }}
+            onEventDelete={(eventId) => {
+              console.log('Event deleted:', eventId);
+            }}
+          />
+        </div>
+
+        {/* Memory Management - 20% Width */}
+        <div className="w-full xl:w-1/5 flex-shrink-0 bg-white overflow-hidden">
           <MemoryManagement
             memories={memories}
             onSearchMemories={handleSearchMemories}
             onDeleteMemory={handleDeleteMemory}
-            totalMemories={stats.totalMemories || memories.length}
-            memoryTypes={getMemoryTypes()}
+            totalMemories={memories.length}
+            memoryTypes={new Set(memories.map(m => m.type)).size}
+            onGrantPermission={handleGrantPermission}
+            onRevokePermission={handleRevokePermission}
           />
         </div>
       </main>

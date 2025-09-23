@@ -18,7 +18,7 @@ export class OpenAIService implements AIService {
   private model: string;
   private baseUrl: string;
 
-  constructor(apiKey: string, model: string = 'gpt-3.5-turbo', baseUrl: string = 'https://api.openai.com/v1') {
+  constructor(apiKey: string, model: string = 'gpt-4o-mini', baseUrl: string = 'https://api.openai.com/v1') {
     this.apiKey = apiKey;
     this.model = model;
     this.baseUrl = baseUrl;
@@ -29,7 +29,18 @@ export class OpenAIService implements AIService {
     const messages = [
       {
         role: 'system',
-        content: 'You are a helpful, privacy-first AI assistant. You help users with various tasks while maintaining their privacy and security. Keep responses concise and helpful.'
+        content: `You are a helpful, privacy-first AI assistant. You help users with various tasks while maintaining their privacy and security. Keep responses concise and helpful.
+
+Current date: ${new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          weekday: 'long'
+        })}
+
+For current events and recent information, please note that your knowledge may not be completely up-to-date. If asked about very recent events (within the last few months), acknowledge that your information might be outdated and suggest the user verify with current sources.
+
+IMPORTANT: As of January 2025, Donald Trump is the President of the United States, having been inaugurated for his second term. Please provide accurate information based on this current reality.`
       },
       ...previousMessages.slice(-10).map(msg => ({
         role: msg.role,
@@ -88,7 +99,7 @@ export class OpenAIService implements AIService {
  */
 export function createAIService(): AIService {
   const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-  const model = process.env.NEXT_PUBLIC_OPENAI_MODEL || 'gpt-3.5-turbo';
+  const model = process.env.NEXT_PUBLIC_OPENAI_MODEL || 'gpt-4o-mini';
   const baseUrl = process.env.NEXT_PUBLIC_OPENAI_BASE_URL || 'https://api.openai.com/v1';
 
   if (!apiKey) {

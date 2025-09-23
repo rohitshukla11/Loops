@@ -1,7 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { getNearWallet } from '@/lib/near-wallet'
+import { createContext, useContext, useState, ReactNode } from 'react'
 
 interface WalletContextType {
   isConnected: boolean
@@ -18,45 +17,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
   const [accountId, setAccountId] = useState<string | null>(null)
   const [balance, setBalance] = useState('0')
-  const [isLoading, setIsLoading] = useState(true)
-
-  const nearWallet = getNearWallet()
-
-  useEffect(() => {
-    initializeWallet()
-  }, [])
-
-  const initializeWallet = async () => {
-    try {
-      await nearWallet.initialize()
-      const connected = nearWallet.isConnected()
-      setIsConnected(connected)
-      
-      if (connected) {
-        setAccountId(nearWallet.getAccountId())
-        const accountBalance = await nearWallet.getAccountBalance()
-        setBalance(accountBalance)
-      }
-    } catch (error) {
-      console.error('Failed to initialize wallet:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const [isLoading, setIsLoading] = useState(false)
 
   const connect = async (): Promise<boolean> => {
     try {
       setIsLoading(true)
-      const success = await nearWallet.connectWallet()
-      
-      if (success) {
-        setIsConnected(true)
-        setAccountId(nearWallet.getAccountId())
-        const accountBalance = await nearWallet.getAccountBalance()
-        setBalance(accountBalance)
-      }
-      
-      return success
+      // Simulate wallet connection for UI purposes only
+      // Memory operations use Golem Base directly without wallet dependency
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setIsConnected(true)
+      setAccountId('ethereum-wallet')
+      setBalance('0.000')
+      return true
     } catch (error) {
       console.error('Failed to connect wallet:', error)
       return false
@@ -67,7 +39,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const disconnect = async (): Promise<void> => {
     try {
-      await nearWallet.disconnectWallet()
       setIsConnected(false)
       setAccountId(null)
       setBalance('0')
@@ -82,7 +53,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     balance,
     connect,
     disconnect,
-    isLoading,
+    isLoading
   }
 
   return (
@@ -99,6 +70,3 @@ export function useWallet() {
   }
   return context
 }
-
-
-

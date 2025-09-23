@@ -41,8 +41,18 @@ export class GolemStorageService {
 
     try {
       // Validate private key
-      if (!this.config.privateKey || this.config.privateKey === '0x0000000000000000000000000000000000000000000000000000000000000000') {
-        throw new Error('Invalid private key. Please set NEXT_PUBLIC_GOLEM_PRIVATE_KEY in your environment variables.');
+      const cleanPrivateKey = this.config.privateKey.replace('0x', '').trim();
+      console.log('🔍 Private key validation:', {
+        original: this.config.privateKey,
+        cleaned: cleanPrivateKey,
+        length: cleanPrivateKey.length,
+        isDefault: cleanPrivateKey === '0000000000000000000000000000000000000000000000000000000000000000'
+      });
+      
+      if (!this.config.privateKey || 
+          cleanPrivateKey === '0000000000000000000000000000000000000000000000000000000000000000' ||
+          cleanPrivateKey.length !== 64) {
+        throw new Error(`Invalid private key. Length: ${cleanPrivateKey.length}, Expected: 64. Please set NEXT_PUBLIC_GOLEM_PRIVATE_KEY in your environment variables.`);
       }
 
       // Create account data from private key
@@ -60,7 +70,10 @@ export class GolemStorageService {
       );
 
       this.isInitialized = true;
-      console.log('Golem Base storage service initialized successfully');
+      console.log('✅ Golem Base storage service initialized successfully');
+      console.log('✅ Client object:', this.client);
+      console.log('✅ Chain ID:', this.config.chainId);
+      console.log('✅ RPC URL:', this.config.rpcUrl);
       
       // Load existing entity keys from localStorage for persistence
       this.loadEntityKeysFromStorage();
@@ -189,7 +202,8 @@ export class GolemStorageService {
       this.saveEntityKeysToStorage();
 
       // Generate transaction URL for Golem Base
-      const txUrl = `https://explorer.kaolin.holesky.golemdb.io/entity/${entityResult.entityKey}`;
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      const txUrl = `${explorerUrl}/entity/${entityResult.entityKey}`;
       
       console.log(`✅ Memory uploaded successfully!`);
       console.log(`📋 Upload result:`, entityResult);
@@ -226,7 +240,8 @@ export class GolemStorageService {
       console.log(`🔍 Retrieving memory with entity key: ${entityKey}`);
       
       // Generate transaction URL for Golem Base
-      const txUrl = `https://explorer.kaolin.holesky.golemdb.io/entity/${entityKey}`;
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      const txUrl = `${explorerUrl}/entity/${entityKey}`;
       console.log(`🔗 Transaction URL: ${txUrl}`);
 
       // Get the storage value directly using the entity key
@@ -293,7 +308,8 @@ export class GolemStorageService {
       console.log(`📝 Updating memory with entity key: ${entityKey}`);
       
       // Generate transaction URL for Golem Base
-      const txUrl = `https://explorer.kaolin.holesky.golemdb.io/entity/${entityKey}`;
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      const txUrl = `${explorerUrl}/entity/${entityKey}`;
       console.log(`🔗 Transaction URL: ${txUrl}`);
 
       // Prepare the updated memory data
@@ -368,7 +384,8 @@ export class GolemStorageService {
       console.log(`🗑️ Deleting memory with entity key: ${entityKey}`);
       
       // Generate transaction URL for Golem Base
-      const txUrl = `https://explorer.kaolin.holesky.golemdb.io/entity/${entityKey}`;
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      const txUrl = `${explorerUrl}/entity/${entityKey}`;
       console.log(`🔗 Transaction URL: ${txUrl}`);
 
       // Remove from local tracking
@@ -403,10 +420,14 @@ export class GolemStorageService {
       console.log(`🔍 Searching memories with query: "${query}", owner: ${owner}, limit: ${limit}`);
 
       // Use the efficient owner-based method to get owned entities
+      console.log('🔍 Starting queryEntities with empty query...');
       const entities = await this.queryEntities('');
       
+      console.log(`🔍 Query entities result:`, entities);
+      console.log(`🔍 Number of entities found:`, entities?.length || 0);
+      
       if (!entities || entities.length === 0) {
-        console.log('No owned entities found');
+        console.log('🔍 No owned entities found - this is normal for a fresh installation');
         return [];
       }
 
@@ -553,7 +574,10 @@ export class GolemStorageService {
       console.log('📊 Owner address:', ownerAddress);
       
       // Use getEntitiesOfOwner for much more efficient retrieval
+      console.log('📊 Calling getEntitiesOfOwner...');
       const entityKeys = await this.client.getEntitiesOfOwner(ownerAddress);
+      console.log('📊 Entity keys result:', entityKeys);
+      console.log('📊 Number of entity keys:', entityKeys?.length || 0);
       
       console.log(`📊 Retrieved ${entityKeys.length} entity keys owned by ${ownerAddress}`);
       

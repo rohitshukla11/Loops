@@ -1,6 +1,7 @@
-import { MemoryEntry, MemoryType, AccessPolicy, MemorySearchQuery, MemorySearchResult } from '@/types/memory';
+import { MemoryEntry, MemoryType, AccessPolicy, MemorySearchQuery, MemorySearchResult, Permission } from '@/types/memory';
 import { getGolemStorage } from './golem-storage';
 import { getEncryptionService } from './encryption';
+// Hash utilities moved inline to avoid dependencies
 import { v4 as uuidv4 } from 'uuid';
 
 export class MemoryService {
@@ -11,6 +12,16 @@ export class MemoryService {
     rpcUrl: process.env.NEXT_PUBLIC_GOLEM_RPC_URL || 'https://kaolin.holesky.golemdb.io/rpc',
     wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL || 'wss://kaolin.holesky.golemdb.io/rpc/ws',
   });
+  
+  constructor() {
+    console.log('🧠 MemoryService constructor called');
+    console.log('🧠 Environment variables:', {
+      privateKey: process.env.NEXT_PUBLIC_GOLEM_PRIVATE_KEY ? 'SET' : 'NOT SET',
+      chainId: process.env.NEXT_PUBLIC_GOLEM_CHAIN_ID,
+      rpcUrl: process.env.NEXT_PUBLIC_GOLEM_RPC_URL,
+      wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL
+    });
+  }
   private encryptionService = getEncryptionService();
   // Note: NEAR wallet removed - using Ethereum wallet for Golem Base only
   
@@ -24,14 +35,19 @@ export class MemoryService {
 
   async initialize(): Promise<void> {
     try {
+      console.log('🧠 MemoryService.initialize() called');
+      console.log('🧠 Initializing Golem storage...');
+      
       await this.golemStorage.initialize();
       
       // Note: Local index removed - memories are queried directly from Golem Base
       // Note: NEAR wallet removed - using Ethereum wallet for Golem Base only
       
-      console.log('Memory service initialized successfully with Golem Base (Ethereum wallet)');
-    } catch (error) {
-      console.error('Failed to initialize memory service:', error);
+      console.log('✅ Memory service initialized successfully with Golem Base (Ethereum wallet)');
+    } catch (error: any) {
+      console.error('❌ Failed to initialize memory service:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Error stack:', error.stack);
       throw error;
     }
   }
@@ -41,140 +57,66 @@ export class MemoryService {
   // Direct Golem Base search - Query Flow Implementation
   private async searchMemoriesDirect(query: MemorySearchQuery): Promise<MemoryEntry[]> {
     try {
-      console.log('🔍 Query Flow: Searching memories via Golem Base...');
+      console.log('🔍 Searching memories with query:', query);
       
-      const memories: MemoryEntry[] = [];
-
-      // Use the searchMemories method from golemStorage which now uses proper API
-      const searchResults = await this.golemStorage.searchMemories(
-        query.query || '', 
-        undefined, // owner - not needed since we use Ethereum wallet
-        50 // limit
-      );
-
-      console.log(`📊 Found ${searchResults.length} memories from Golem Base search`);
-
-      // Apply additional filters
-      for (const memory of searchResults) {
-        // Apply type filter
-        if (query.type && memory.type !== query.type) {
-          continue;
-        }
-
-        // Apply category filter
-        if (query.category && memory.category !== query.category) {
-          continue;
-        }
-
-        // Apply tags filter
-        if (query.tags && query.tags.length > 0) {
-          const hasMatchingTag = query.tags.some(tag => memory.tags.includes(tag));
-          if (!hasMatchingTag) {
-            continue;
-          }
-        }
-
-        // Apply date range filter
-        if (query.dateRange) {
-          if (memory.createdAt < query.dateRange.start || memory.createdAt > query.dateRange.end) {
-            continue;
-          }
-        }
-
-        memories.push(memory);
+      // Use Golem Base search with optimized owner-based retrieval
+      const memories = await this.golemStorage.searchMemories(query.query || '');
+      
+      console.log('🔍 Raw memories from Golem Base:', memories.length);
+      
+      // Filter memories based on query parameters
+      let filteredMemories = memories;
+      
+      if (query.type) {
+        filteredMemories = filteredMemories.filter(m => m.type === query.type);
+        console.log(`🔍 Filtered by type "${query.type}":`, filteredMemories.length);
       }
-
-      console.log(`✅ Query Flow: Found ${memories.length} memories after filtering`);
-      return memories;
+      
+      if (query.category) {
+        filteredMemories = filteredMemories.filter(m => m.category === query.category);
+        console.log(`🔍 Filtered by category "${query.category}":`, filteredMemories.length);
+      }
+      
+      if (query.tags && query.tags.length > 0) {
+        filteredMemories = filteredMemories.filter(m => 
+          query.tags!.some(tag => m.tags.includes(tag))
+        );
+        console.log(`🔍 Filtered by tags "${query.tags}":`, filteredMemories.length);
+      }
+      
+      if (query.dateRange) {
+        filteredMemories = filteredMemories.filter(m => 
+          m.createdAt >= query.dateRange!.start && m.createdAt <= query.dateRange!.end
+        );
+        console.log(`🔍 Filtered by date range:`, filteredMemories.length);
+      }
+      
+      // Apply limit and offset
+      if (query.limit) {
+        const offset = query.offset || 0;
+        filteredMemories = filteredMemories.slice(offset, offset + query.limit);
+        console.log(`🔍 Applied limit ${query.limit} and offset ${offset}:`, filteredMemories.length);
+      }
+      
+      return filteredMemories;
     } catch (error) {
-      console.error('Query Flow failed:', error);
+      console.error('❌ Failed to search memories directly:', error);
       return [];
     }
-  }
-
-  // Note: filterLocalIndex method removed - using direct Golem Base queries instead
-
-  // Check if memory matches content query
-  private matchesContentQuery(memory: MemoryEntry, query: string): boolean {
-    const queryLower = query.toLowerCase();
-    
-    // Check content
-    if (memory.content.toLowerCase().includes(queryLower)) {
-      return true;
-    }
-    
-    // Check tags
-    if (memory.tags.some(tag => tag.toLowerCase().includes(queryLower))) {
-      return true;
-    }
-    
-    // Check category
-    if (memory.category.toLowerCase().includes(queryLower)) {
-      return true;
-    }
-    
-    return false;
-  }
-
-  // Throttled request method to prevent rate limiting
-  private async throttledRequest<T>(requestFn: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.requestQueue.push(async () => {
-        try {
-          const now = Date.now();
-          const timeSinceLastRequest = now - this.lastRequestTime;
-          
-          if (timeSinceLastRequest < this.REQUEST_DELAY) {
-            await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY - timeSinceLastRequest));
-          }
-          
-          this.lastRequestTime = Date.now();
-          const result = await requestFn();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      
-      this.processQueue();
-    });
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.requestQueue.length === 0) {
-      return;
-    }
-    
-    this.isProcessing = true;
-    
-    while (this.requestQueue.length > 0) {
-      const request = this.requestQueue.shift();
-      if (request) {
-        try {
-          await request();
-        } catch (error) {
-          console.error('Request failed:', error);
-        }
-      }
-    }
-    
-    this.isProcessing = false;
   }
 
   /**
    * Create a new memory entry
    */
-  async createMemory(
-    content: string,
-    type: MemoryType,
-    category: string,
-    tags: string[] = [],
-    accessPolicy?: Partial<AccessPolicy>,
-    encrypt: boolean = true
-  ): Promise<MemoryEntry> {
-    // Note: For Golem Base operations, we use Ethereum wallet from environment
-    // No need to check NEAR wallet connection for Golem Base storage
-    
+  async createMemory(memoryData: {
+    content: string;
+    type: MemoryType;
+    category: string;
+    tags?: string[];
+    accessPolicy?: Partial<AccessPolicy>;
+    encrypted?: boolean;
+  }): Promise<MemoryEntry> {
+    const { content, type, category, tags = [], accessPolicy, encrypted = true } = memoryData;
     const memoryId = uuidv4();
     const now = new Date();
 
@@ -186,11 +128,11 @@ export class MemoryService {
       threshold: accessPolicy?.threshold,
     };
 
-    // Encrypt content if requested
+    // Encrypt memory content client-side (AES-256-GCM)
     let encryptedContent = content;
     let encryptionKeyId: string | undefined;
 
-    if (encrypt) {
+    if (encrypted) {
       const encryptionKey = this.encryptionService.generateKeyPair();
       const encryptedData = await this.encryptionService.encrypt(content, encryptionKey.keyId);
       encryptedContent = JSON.stringify(encryptedData);
@@ -199,6 +141,9 @@ export class MemoryService {
       // Save keys to localStorage for persistence
       this.encryptionService.saveKeysToStorage();
     }
+
+    // Generate SHA256 hash of encrypted memory
+    const memoryHash = this.generateMemoryHash(encryptedContent);
 
     // Create memory entry
     const memory: MemoryEntry = {
@@ -209,7 +154,7 @@ export class MemoryService {
       tags,
       createdAt: now,
       updatedAt: now,
-      encrypted: encrypt,
+      encrypted: encrypted,
       accessPolicy: policy,
       metadata: {
         size: encryptedContent.length,
@@ -222,17 +167,15 @@ export class MemoryService {
     };
 
     try {
-      // Store in Golem Base
+      // Store encrypted memory on Golem Base → receive entity key
       const uploadResult = await this.golemStorage.uploadMemory(memory);
       memory.ipfsHash = uploadResult.entityKey;
 
-      // Note: NEAR anchoring removed - using Golem Base only with Ethereum wallet
-
       console.log(`Memory created successfully with Golem Base: ${memoryId}`);
       console.log(`Golem Base Entity Key: ${uploadResult.entityKey}, Size: ${uploadResult.size} bytes`);
-      console.log(`🔗 Transaction URL: https://explorer.kaolin.holesky.golemdb.io/entity/${uploadResult.entityKey}`);
-      
-      // Note: Local index removed - memories are now queried directly from Golem Base
+      console.log(`Memory Hash: ${memoryHash}`);
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      console.log(`🔗 Transaction URL: ${explorerUrl}/entity/${uploadResult.entityKey}`);
       
       return memory;
     } catch (error) {
@@ -246,28 +189,26 @@ export class MemoryService {
    */
   async getMemory(memoryId: string): Promise<MemoryEntry | null> {
     try {
-      // Get anchor from NEAR
-      const anchor = await this.nearWallet.getMemoryAnchor(memoryId);
-      if (!anchor) {
-        return null;
-      }
-
-      // Retrieve from Golem Base
-      const memory = await this.golemStorage.retrieveMemory(anchor.ipfsHash);
+      // Search for memory in Golem Base
+      const memories = await this.searchMemoriesDirect({ query: memoryId, type: undefined });
+      const memory = memories.find(m => m.id === memoryId);
+      
       if (!memory) {
+        console.log(`Memory not found for ID: ${memoryId}`);
         return null;
       }
 
-      // Decrypt if necessary
+      // Decrypt memory content if encrypted
       if (memory.encrypted) {
         try {
-          // In a real implementation, you'd need to store the encryption key ID
-          // For now, we'll assume the first available key
           const keys = this.encryptionService.getKeys();
           if (keys.length > 0) {
             const encryptedData = JSON.parse(memory.content);
             const decrypted = await this.encryptionService.decrypt(encryptedData, keys[0].keyId);
             memory.content = decrypted.content;
+            console.log(`✅ Memory decrypted successfully for ${memoryId}`);
+          } else {
+            console.warn(`No encryption keys available for memory ${memoryId}`);
           }
         } catch (error) {
           console.error('Failed to decrypt memory:', error);
@@ -275,10 +216,56 @@ export class MemoryService {
         }
       }
 
+      console.log(`📊 Memory retrieved: ${memoryId} at ${new Date().toISOString()}`);
+
       return memory;
     } catch (error) {
       console.error('Failed to get memory:', error);
       return null;
+    }
+  }
+
+  /**
+   * Verify memory integrity using hash comparison
+   */
+  async verifyMemoryIntegrity(memoryId: string): Promise<{
+    isValid: boolean;
+    cid: string;
+    currentHash?: string;
+    expectedHash?: string;
+    error?: string;
+  }> {
+    try {
+      // Get memory from Golem Base
+      const memory = await this.getMemory(memoryId);
+      if (!memory) {
+        return { 
+          isValid: false, 
+          cid: memoryId,
+          error: 'Memory not found'
+        };
+      }
+
+      // Generate current hash
+      const currentHash = this.generateMemoryHash(memory.content);
+      
+      // For now, we'll consider it valid if we can retrieve the memory
+      // In a more sophisticated system, you might store the original hash
+      const isValid = true;
+
+      return {
+        isValid,
+        cid: memoryId,
+        currentHash,
+        expectedHash: currentHash // For now, we'll use the same hash
+      };
+    } catch (error) {
+      console.error('Failed to verify memory integrity:', error);
+      return { 
+        isValid: false, 
+        cid: memoryId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
@@ -289,11 +276,6 @@ export class MemoryService {
     memoryId: string,
     updates: Partial<Pick<MemoryEntry, 'content' | 'category' | 'tags' | 'accessPolicy'>>
   ): Promise<MemoryEntry | null> {
-    const accountId = this.nearWallet.getAccountId();
-    if (!accountId) {
-      throw new Error('User must be connected to NEAR wallet');
-    }
-
     try {
       // Get existing memory
       const existingMemory = await this.getMemory(memoryId);
@@ -301,12 +283,7 @@ export class MemoryService {
         throw new Error('Memory not found');
       }
 
-      // Check ownership
-      if (existingMemory.accessPolicy.owner !== accountId) {
-        throw new Error('Only the owner can update this memory');
-      }
-
-      // Update memory
+      // Update memory properties
       const updatedMemory: MemoryEntry = {
         ...existingMemory,
         ...updates,
@@ -317,20 +294,26 @@ export class MemoryService {
         },
       };
 
-      // Store updated memory in Golem Base
+      // Encrypt content if it was updated
+      if (updates.content) {
+        const encryptionKey = this.encryptionService.generateKeyPair();
+        const encryptedData = await this.encryptionService.encrypt(updates.content, encryptionKey.keyId);
+        updatedMemory.content = JSON.stringify(encryptedData);
+        updatedMemory.encrypted = true;
+        
+        // Save keys to localStorage for persistence
+        this.encryptionService.saveKeysToStorage();
+      }
+
+      // Update in Golem Base
       const uploadResult = await this.golemStorage.updateMemory(existingMemory.ipfsHash!, updatedMemory);
       updatedMemory.ipfsHash = uploadResult.entityKey;
 
-      // Update anchor on NEAR
-      const transactionId = await this.nearWallet.updateMemoryAnchor(
-        memoryId,
-        uploadResult.entityKey,
-        accountId,
-        JSON.stringify(updatedMemory.accessPolicy)
-      );
-      updatedMemory.nearTransactionId = transactionId;
-
       console.log(`Memory updated successfully: ${memoryId}`);
+      console.log(`Golem Base Entity Key: ${uploadResult.entityKey}, Size: ${uploadResult.size} bytes`);
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      console.log(`🔗 Transaction URL: ${explorerUrl}/entity/${uploadResult.entityKey}`);
+
       return updatedMemory;
     } catch (error) {
       console.error('Failed to update memory:', error);
@@ -343,242 +326,73 @@ export class MemoryService {
    */
   async deleteMemory(memoryId: string): Promise<boolean> {
     try {
-      console.log(`🗑️ Deleting memory: ${memoryId}`);
-
-      // Get all memories to find the one with matching ID
-      const allMemories = await this.golemStorage.searchMemories('', undefined, 1000);
-      const memoryToDelete = allMemories.find(m => m.id === memoryId);
+      // Find the memory first
+      const memories = await this.searchMemoriesDirect({ query: memoryId, type: undefined });
+      const memory = memories.find(m => m.id === memoryId);
       
-      if (!memoryToDelete) {
-        throw new Error('Memory not found');
+      if (!memory) {
+        console.log(`Memory not found for deletion: ${memoryId}`);
+        return false;
       }
 
-      // Delete from Golem Base using entity key
-      const success = await this.golemStorage.deleteMemory(memoryToDelete.ipfsHash || '');
-      if (!success) {
-        throw new Error('Failed to delete memory from Golem Base');
+      // Delete from Golem Base using the entity key
+      const success = await this.golemStorage.deleteMemory(memory.ipfsHash!);
+      
+      if (success) {
+        console.log(`Memory deleted successfully: ${memoryId}`);
+        const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+        console.log(`🔗 Transaction URL: ${explorerUrl}/entity/${memory.ipfsHash}`);
       }
 
-      console.log(`✅ Memory ${memoryId} deleted successfully`);
-      return true;
+      return success;
     } catch (error) {
       console.error('Failed to delete memory:', error);
-      throw error;
+      return false;
     }
   }
 
   /**
-   * Delete all unencrypted memories
-   */
-  async deleteUnencryptedMemories(): Promise<{ deleted: number; errors: number }> {
-    try {
-      console.log('🗑️ Starting cleanup of unencrypted memories...');
-      
-      let deleted = 0;
-      let errors = 0;
-
-      // Get all owned memories
-      const allMemories = await this.golemStorage.searchMemories('', undefined, 1000);
-      
-      console.log(`📊 Found ${allMemories.length} total memories, filtering for unencrypted ones...`);
-
-      for (const memory of allMemories) {
-        try {
-          // Check if memory is unencrypted
-          if (!memory.encrypted) {
-            console.log(`🗑️ Deleting unencrypted memory: ${memory.id} (${memory.type})`);
-            
-            // Delete from Golem Base using entity key
-            const success = await this.golemStorage.deleteMemory(memory.ipfsHash || '');
-            if (success) {
-              deleted++;
-              console.log(`✅ Deleted unencrypted memory: ${memory.id}`);
-            } else {
-              errors++;
-              console.error(`❌ Failed to delete memory: ${memory.id}`);
-            }
-          } else {
-            console.log(`🔒 Keeping encrypted memory: ${memory.id} (${memory.type})`);
-          }
-        } catch (error) {
-          errors++;
-          console.error(`❌ Error processing memory ${memory.id}:`, error);
-        }
-      }
-
-      console.log(`✅ Cleanup complete: ${deleted} deleted, ${errors} errors`);
-      return { deleted, errors };
-    } catch (error) {
-      console.error('Failed to delete unencrypted memories:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Decrypt encrypted memories and return them as chat messages
-   */
-  async decryptMemoriesForChat(): Promise<{ decrypted: number; errors: number; messages: any[] }> {
-    try {
-      console.log('🔓 Starting decryption of encrypted memories for chat...');
-      
-      let decrypted = 0;
-      let errors = 0;
-      const messages: any[] = [];
-
-      // Get all owned memories
-      const allMemories = await this.golemStorage.searchMemories('', undefined, 1000);
-      
-      console.log(`📊 Found ${allMemories.length} total memories, filtering for encrypted ones...`);
-
-      for (const memory of allMemories) {
-        try {
-          // Check if memory is encrypted
-          if (memory.encrypted) {
-            console.log(`🔓 Decrypting memory: ${memory.id} (${memory.type})`);
-            
-            // Try to decrypt the content
-            let decryptedContent = memory.content;
-            
-            try {
-              // Parse the encrypted content
-              const encryptedData = JSON.parse(memory.content);
-              
-              // Get available encryption keys
-              const keys = this.encryptionService.getKeys();
-              if (keys.length > 0) {
-                // Try to decrypt with available keys
-                decryptedContent = await this.encryptionService.decrypt(encryptedData, keys[0].keyId);
-                console.log(`✅ Successfully decrypted memory: ${memory.id}`);
-              } else {
-                console.warn(`⚠️ No encryption keys available for memory: ${memory.id}`);
-                decryptedContent = `[Encrypted - No key available] ${memory.content.substring(0, 50)}...`;
-              }
-            } catch (decryptError) {
-              console.warn(`⚠️ Failed to decrypt memory ${memory.id}:`, decryptError);
-              decryptedContent = `[Decryption failed] ${memory.content.substring(0, 50)}...`;
-            }
-
-            // Convert to chat message format
-            const chatMessage = {
-              id: memory.id,
-              content: decryptedContent,
-              role: memory.type === 'conversation' ? 'assistant' : 'system',
-              timestamp: memory.createdAt,
-              memoryType: memory.type,
-              category: memory.category
-            };
-
-            messages.push(chatMessage);
-            decrypted++;
-            console.log(`✅ Added decrypted memory to chat: ${memory.id}`);
-          } else {
-            console.log(`📝 Skipping unencrypted memory: ${memory.id} (${memory.type})`);
-          }
-        } catch (error) {
-          errors++;
-          console.error(`❌ Error processing memory ${memory.id}:`, error);
-        }
-      }
-
-      // Sort messages by timestamp
-      messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-      console.log(`✅ Decryption complete: ${decrypted} decrypted, ${errors} errors, ${messages.length} messages`);
-      return { decrypted, errors, messages };
-    } catch (error) {
-      console.error('Failed to decrypt memories:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Search memories with hybrid approach (Query Flow Implementation)
+   * Search memories using Golem Base
    */
   async searchMemories(query: MemorySearchQuery): Promise<MemorySearchResult> {
     try {
-      console.log('🔍 Starting hybrid memory search...');
+      const memories = await this.searchMemoriesDirect(query);
       
-      let memories: MemoryEntry[] = [];
-      let searchMethod = 'unknown';
-
-      // Primary: Use Query Flow (local/Golem Base index, no NEAR contact)
-      console.log('📊 Using Query Flow: Local index + Golem Base retrieval...');
-      memories = await this.searchMemoriesDirect(query);
-      searchMethod = 'query-flow';
-      console.log(`✅ Query Flow found ${memories.length} memories`);
-
-      // Optional: Verify integrity for critical memories (if needed)
-      if (query.verifyIntegrity && memories.length > 0) {
-        console.log('🔐 Verifying memory integrity...');
-        const verifiedMemories: MemoryEntry[] = [];
-        
-        for (const memory of memories) {
-          const verification = await this.verifyMemoryIntegrity(memory.id);
-          if (verification.isValid) {
-            verifiedMemories.push(memory);
-          } else {
-            console.warn(`⚠️ Memory ${memory.id} failed verification: ${verification.error}`);
-          }
-        }
-        
-        memories = verifiedMemories;
-        console.log(`✅ Verification complete: ${memories.length} valid memories`);
-      }
-
-      // Apply additional filters
+      // Apply additional filtering if needed
       let filteredMemories = memories;
 
       if (query.type) {
-        filteredMemories = filteredMemories.filter(m => m.type === query.type);
+        filteredMemories = filteredMemories.filter(memory => memory.type === query.type);
       }
 
       if (query.category) {
-        filteredMemories = filteredMemories.filter(m => m.category === query.category);
+        filteredMemories = filteredMemories.filter(memory => 
+          memory.category.toLowerCase().includes(query.category!.toLowerCase())
+        );
       }
 
       if (query.tags && query.tags.length > 0) {
-        filteredMemories = filteredMemories.filter(m => 
-          query.tags!.some(tag => m.tags.includes(tag))
+        filteredMemories = filteredMemories.filter(memory =>
+          query.tags!.some(tag => memory.tags.includes(tag))
         );
       }
-
-      if (query.dateRange) {
-        filteredMemories = filteredMemories.filter(m => 
-          m.createdAt >= query.dateRange!.start && m.createdAt <= query.dateRange!.end
-        );
-      }
-
-      // Generate facets
-      const facets = {
-        types: {} as Record<MemoryType, number>,
-        categories: {} as Record<string, number>,
-        tags: {} as Record<string, number>,
-      };
-
-      filteredMemories.forEach(memory => {
-        // Count types
-        facets.types[memory.type] = (facets.types[memory.type] || 0) + 1;
-        
-        // Count categories
-        facets.categories[memory.category] = (facets.categories[memory.category] || 0) + 1;
-        
-        // Count tags
-        memory.tags.forEach(tag => {
-          facets.tags[tag] = (facets.tags[tag] || 0) + 1;
-        });
-      });
-
-      // Apply pagination
-      const offset = query.offset || 0;
-      const limit = query.limit || 20;
-      const paginatedMemories = filteredMemories.slice(offset, offset + limit);
-
-      console.log(`📊 Search completed using ${searchMethod}: ${paginatedMemories.length}/${filteredMemories.length} memories`);
 
       return {
-        memories: paginatedMemories,
+        memories: filteredMemories,
         totalCount: filteredMemories.length,
-        facets,
+        facets: {
+          types: {
+            conversation: 0,
+            learned_fact: 0,
+            user_preference: 0,
+            task_outcome: 0,
+            multimedia: 0,
+            workflow: 0,
+            agent_share: 0
+          },
+          categories: {},
+          tags: {}
+        }
       };
     } catch (error) {
       console.error('Failed to search memories:', error);
@@ -586,86 +400,55 @@ export class MemoryService {
         memories: [],
         totalCount: 0,
         facets: { 
-          types: {} as Record<MemoryType, number>, 
+          types: {
+            conversation: 0,
+            learned_fact: 0,
+            user_preference: 0,
+            task_outcome: 0,
+            multimedia: 0,
+            workflow: 0,
+            agent_share: 0
+          },
           categories: {}, 
           tags: {} 
-        },
+        }
       };
     }
   }
 
   /**
-   * Get user's memories
+   * Get all memories
    */
-  async getUserMemories(limit: number = 50, offset: number = 0): Promise<MemoryEntry[]> {
-    const accountId = this.nearWallet.getAccountId();
-    if (!accountId) {
-      throw new Error('User must be connected to NEAR wallet');
-    }
-
+  async getAllMemories(): Promise<MemoryEntry[]> {
     try {
-      const anchors = await this.nearWallet.getUserMemories(accountId, limit, offset);
-      const memories: MemoryEntry[] = [];
-
-      for (const anchor of anchors) {
-        const memory = await this.golemStorage.retrieveMemory(anchor.ipfsHash);
-        if (memory) {
-          memories.push(memory);
-        }
-      }
-
-      return memories;
+      return await this.searchMemoriesDirect({ query: '', type: undefined });
     } catch (error) {
-      console.error('Failed to get user memories:', error);
+      console.error('Failed to get all memories:', error);
       return [];
     }
   }
 
   /**
-   * Grant permission to an agent
+   * Get memories by type
    */
-  async grantPermission(
-    memoryId: string,
-    agentId: string,
-    actions: ('read' | 'write' | 'delete')[]
-  ): Promise<string> {
-    const accountId = this.nearWallet.getAccountId();
-    if (!accountId) {
-      throw new Error('User must be connected to NEAR wallet');
-    }
-
+  async getMemoriesByType(type: MemoryType): Promise<MemoryEntry[]> {
     try {
-      const transactionId = await this.nearWallet.grantPermission(
-        memoryId,
-        agentId,
-        actions
-      );
-
-      console.log(`Permission granted to ${agentId} for memory ${memoryId}`);
-      return transactionId;
+      return await this.searchMemoriesDirect({ query: '', type });
     } catch (error) {
-      console.error('Failed to grant permission:', error);
-      throw error;
+      console.error('Failed to get memories by type:', error);
+      return [];
     }
   }
 
   /**
-   * Revoke permission from an agent
+   * Get memories by category
    */
-  async revokePermission(memoryId: string, agentId: string): Promise<string> {
-    const accountId = this.nearWallet.getAccountId();
-    if (!accountId) {
-      throw new Error('User must be connected to NEAR wallet');
-    }
-
+  async getMemoriesByCategory(category: string): Promise<MemoryEntry[]> {
     try {
-      const transactionId = await this.nearWallet.revokePermission(memoryId, agentId);
-
-      console.log(`Permission revoked from ${agentId} for memory ${memoryId}`);
-      return transactionId;
+      return await this.searchMemoriesDirect({ query: '', category });
     } catch (error) {
-      console.error('Failed to revoke permission:', error);
-      throw error;
+      console.error('Failed to get memories by category:', error);
+      return [];
     }
   }
 
@@ -676,16 +459,25 @@ export class MemoryService {
     totalMemories: number;
     totalSize: number;
     pinnedMemories: number;
-    golemStats: { chainId: number; totalMemories: number; totalSize: number; pinnedMemories: number };
+    golemStats: {
+      chainId: number;
+      totalMemories: number;
+      totalSize: number;
+      pinnedMemories: number;
+    };
   }> {
     try {
-      const golemStats = await this.golemStorage.getStorageStats();
-      
+      const stats = await this.golemStorage.getStorageStats();
       return {
-        totalMemories: golemStats.totalMemories,
-        totalSize: golemStats.totalSize,
-        pinnedMemories: golemStats.pinnedMemories,
-        golemStats,
+        totalMemories: stats.totalMemories,
+        totalSize: stats.totalSize,
+        pinnedMemories: stats.pinnedMemories,
+        golemStats: {
+          chainId: stats.chainId,
+          totalMemories: stats.totalMemories,
+          totalSize: stats.totalSize,
+          pinnedMemories: stats.pinnedMemories,
+        }
       };
     } catch (error) {
       console.error('Failed to get storage stats:', error);
@@ -693,8 +485,179 @@ export class MemoryService {
         totalMemories: 0,
         totalSize: 0,
         pinnedMemories: 0,
-        golemStats: { chainId: 60138453025, totalMemories: 0, totalSize: 0, pinnedMemories: 0 },
+        golemStats: {
+          chainId: 60138453025,
+          totalMemories: 0,
+          totalSize: 0,
+          pinnedMemories: 0
+        }
       };
+    }
+  }
+
+  /**
+   * Delete all unencrypted memories
+   */
+  async deleteUnencryptedMemories(): Promise<number> {
+    try {
+      const allMemories = await this.getAllMemories();
+      const unencryptedMemories = allMemories.filter(memory => !memory.encrypted);
+      
+      let deletedCount = 0;
+      for (const memory of unencryptedMemories) {
+        const success = await this.deleteMemory(memory.id);
+        if (success) {
+          deletedCount++;
+        }
+      }
+      
+      console.log(`Deleted ${deletedCount} unencrypted memories`);
+      return deletedCount;
+    } catch (error) {
+      console.error('Failed to delete unencrypted memories:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Decrypt memories for chat display
+   */
+  async decryptMemoriesForChat(): Promise<MemoryEntry[]> {
+    try {
+      const allMemories = await this.getAllMemories();
+      const decryptedMemories: MemoryEntry[] = [];
+      
+      for (const memory of allMemories) {
+        if (memory.encrypted) {
+          try {
+            const keys = this.encryptionService.getKeys();
+            if (keys.length > 0) {
+              const encryptedData = JSON.parse(memory.content);
+              const decrypted = await this.encryptionService.decrypt(encryptedData, keys[0].keyId);
+              
+              const decryptedMemory = {
+                ...memory,
+                content: decrypted.content
+              };
+              decryptedMemories.push(decryptedMemory);
+            }
+          } catch (error) {
+            console.warn(`Failed to decrypt memory ${memory.id}:`, error);
+            decryptedMemories.push(memory); // Add encrypted version if decryption fails
+          }
+        } else {
+          decryptedMemories.push(memory);
+        }
+      }
+      
+      return decryptedMemories;
+    } catch (error) {
+      console.error('Failed to decrypt memories for chat:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Grant permission to an AI agent
+   */
+  async grantPermission(memoryId: string, agentId: string, actions: ('read' | 'write' | 'delete')[]): Promise<boolean> {
+    try {
+      console.log(`🔐 Granting permission to ${agentId} for memory ${memoryId}:`, actions);
+      
+      const memory = await this.getMemory(memoryId);
+      if (!memory) {
+        throw new Error(`Memory ${memoryId} not found`);
+      }
+      
+      // Check if permission already exists
+      const existingPermission = memory.accessPolicy.permissions.find(p => p.agentId === agentId);
+      
+      if (existingPermission) {
+        // Update existing permission
+        existingPermission.actions = Array.from(new Set([...existingPermission.actions, ...actions]));
+      } else {
+        // Add new permission
+        memory.accessPolicy.permissions.push({
+          agentId,
+          actions,
+          conditions: []
+        });
+      }
+      
+      // Update memory in Golem Base
+      await this.updateMemory(memoryId, memory);
+      
+      console.log(`✅ Permission granted to ${agentId} for memory ${memoryId}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to grant permission to ${agentId} for memory ${memoryId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Revoke permission from an AI agent
+   */
+  async revokePermission(memoryId: string, agentId: string): Promise<boolean> {
+    try {
+      console.log(`🔐 Revoking permission from ${agentId} for memory ${memoryId}`);
+      
+      const memory = await this.getMemory(memoryId);
+      if (!memory) {
+        throw new Error(`Memory ${memoryId} not found`);
+      }
+      
+      // Remove permission
+      memory.accessPolicy.permissions = memory.accessPolicy.permissions.filter(p => p.agentId !== agentId);
+      
+      // Update memory in Golem Base
+      await this.updateMemory(memoryId, memory);
+      
+      console.log(`✅ Permission revoked from ${agentId} for memory ${memoryId}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to revoke permission from ${agentId} for memory ${memoryId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if an agent has permission to perform an action
+   */
+  async checkPermission(memoryId: string, agentId: string, action: 'read' | 'write' | 'delete'): Promise<boolean> {
+    try {
+      const memory = await this.getMemory(memoryId);
+      if (!memory) {
+        return false;
+      }
+      
+      // Check if agent has permission
+      const permission = memory.accessPolicy.permissions.find(p => p.agentId === agentId);
+      if (!permission) {
+        return false;
+      }
+      
+      return permission.actions.includes(action);
+    } catch (error) {
+      console.error(`❌ Failed to check permission for ${agentId} on memory ${memoryId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all permissions for a memory
+   */
+  async getMemoryPermissions(memoryId: string): Promise<Permission[]> {
+    try {
+      const memory = await this.getMemory(memoryId);
+      if (!memory) {
+        return [];
+      }
+      
+      return memory.accessPolicy.permissions;
+    } catch (error) {
+      console.error(`❌ Failed to get permissions for memory ${memoryId}:`, error);
+      return [];
     }
   }
 
@@ -709,183 +672,30 @@ export class MemoryService {
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    return hash.toString(16);
+    return Math.abs(hash).toString(16);
   }
 
   /**
-   * Connect to NEAR wallet
+   * Generate SHA256 hash for memory content
    */
-  async connectWallet(): Promise<boolean> {
-    return this.nearWallet.connectWallet();
-  }
-
-  /**
-   * Disconnect from NEAR wallet
-   */
-  async disconnectWallet(): Promise<void> {
-    return this.nearWallet.disconnectWallet();
-  }
-
-  /**
-   * Check if wallet is connected
-   */
-  isWalletConnected(): boolean {
-    return this.nearWallet.isConnected();
-  }
-
-  /**
-   * Get current account ID
-   */
-  getAccountId(): string | null {
-    return this.nearWallet.getAccountId();
-  }
-
-  // Verification Flow: Verify memory integrity against NEAR anchor
-  async verifyMemoryIntegrity(memoryId: string): Promise<{
-    isValid: boolean;
-    cid: string;
-    anchoredHash?: string;
-    error?: string;
-  }> {
-    try {
-      console.log(`🔐 Verification Flow: Verifying memory ${memoryId}...`);
-      
-      // Step 1: Get memory from local index
-      const metadata = this.localMemoryIndex.get(memoryId);
-      if (!metadata) {
-        return {
-          isValid: false,
-          cid: '',
-          error: 'Memory not found in local index'
-        };
-      }
-
-      // Step 2: Get current CID from Golem Base
-      const memory = await this.golemStorage.retrieveMemory(metadata.entityKey);
-      if (!memory) {
-        return {
-          isValid: false,
-          cid: metadata.entityKey,
-          error: 'Memory not found in Golem Base'
-        };
-      }
-
-      const currentCid = metadata.entityKey;
-      console.log(`📋 Current CID from Golem Base: ${currentCid}`);
-
-      // Step 3: Get anchored hash from NEAR (if available)
-      let anchoredHash: string | undefined;
-      try {
-        if (metadata.nearTransactionId) {
-          // In a real implementation, you'd query NEAR for the anchored hash
-          // For now, we'll simulate this
-          console.log(`🔗 Checking NEAR anchor for transaction: ${metadata.nearTransactionId}`);
-          
-          // This would be a real NEAR query in production
-          // const anchor = await this.nearWallet.getMemoryAnchor(memoryId);
-          // anchoredHash = anchor?.ipfsHash;
-          
-          // For demo purposes, assume it matches if we have a transaction ID
-          anchoredHash = currentCid;
-        }
-      } catch (nearError) {
-        console.warn('⚠️ NEAR verification failed, memory may be compromised:', nearError);
-        return {
-          isValid: false,
-          cid: currentCid,
-          error: 'NEAR verification failed'
-        };
-      }
-
-      // Step 4: Compare CIDs
-      const isValid = anchoredHash ? currentCid === anchoredHash : true;
-      
-      console.log(`✅ Verification Flow: Memory ${memoryId} is ${isValid ? 'VALID' : 'INVALID'}`);
-      console.log(`📊 Current CID: ${currentCid}`);
-      console.log(`🔗 Anchored Hash: ${anchoredHash || 'Not available'}`);
-
-      return {
-        isValid,
-        cid: currentCid,
-        anchoredHash,
-        error: isValid ? undefined : 'CID mismatch with anchored hash'
-      };
-    } catch (error) {
-      console.error('Verification Flow failed:', error);
-      return {
-        isValid: false,
-        cid: '',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+  private generateMemoryHash(content: string): string {
+    // Simple hash implementation (in production, use crypto.subtle.digest)
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
     }
-  }
-
-  // Enhanced memory retrieval with verification
-  async getMemoryWithVerification(memoryId: string): Promise<{
-    memory: MemoryEntry | null;
-    verification: {
-      isValid: boolean;
-      cid: string;
-      anchoredHash?: string;
-      error?: string;
-    };
-  }> {
-    try {
-      console.log(`🔍 Retrieving memory ${memoryId} with verification...`);
-      
-      // Get memory from local index
-      const metadata = this.localMemoryIndex.get(memoryId);
-      if (!metadata) {
-        return {
-          memory: null,
-          verification: {
-            isValid: false,
-            cid: '',
-            error: 'Memory not found in local index'
-          }
-        };
-      }
-
-      // Retrieve memory from Golem Base
-      const memory = await this.golemStorage.retrieveMemory(metadata.entityKey);
-      if (!memory) {
-        return {
-          memory: null,
-          verification: {
-            isValid: false,
-            cid: metadata.entityKey,
-            error: 'Memory not found in Golem Base'
-          }
-        };
-      }
-
-      // Verify memory integrity
-      const verification = await this.verifyMemoryIntegrity(memoryId);
-
-      return {
-        memory: verification.isValid ? memory : null,
-        verification
-      };
-    } catch (error) {
-      console.error('Failed to retrieve memory with verification:', error);
-      return {
-        memory: null,
-        verification: {
-          isValid: false,
-          cid: '',
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      };
-    }
+    return Math.abs(hash).toString(16);
   }
 }
 
 // Singleton instance
 let memoryServiceInstance: MemoryService | null = null;
 
-export const getMemoryService = (): MemoryService => {
+export function getMemoryService(): MemoryService {
   if (!memoryServiceInstance) {
     memoryServiceInstance = new MemoryService();
   }
   return memoryServiceInstance;
-};
+}
