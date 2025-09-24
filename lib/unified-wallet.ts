@@ -1,8 +1,7 @@
-// Unified wallet service supporting both NEAR and MetaMask
-import { getNearWallet } from './near-wallet';
+// Unified wallet service supporting MetaMask
 import { getMetaMaskWallet, MetaMaskAccount } from './metamask-wallet';
 
-export type WalletType = 'near' | 'metamask';
+export type WalletType = 'metamask';
 
 export interface UnifiedWalletAccount {
   address: string;
@@ -12,26 +11,19 @@ export interface UnifiedWalletAccount {
 }
 
 export class UnifiedWalletService {
-  private nearWallet = getNearWallet();
   private metaMaskWallet = getMetaMaskWallet();
   private currentWalletType: WalletType | null = null;
 
   async initialize(): Promise<void> {
-    // Initialize both wallet services
-    try {
-      await this.nearWallet.initialize();
-    } catch (error) {
-      console.warn('Failed to initialize NEAR wallet:', error);
-    }
+    // MetaMask wallet doesn't need explicit initialization
+    console.log('🦊 MetaMask wallet service ready');
   }
 
-  async connectWallet(walletType: WalletType): Promise<boolean> {
+  async connectWallet(walletType: WalletType = 'metamask'): Promise<boolean> {
     try {
       this.currentWalletType = walletType;
 
-      if (walletType === 'near') {
-        return await this.nearWallet.connectWallet();
-      } else if (walletType === 'metamask') {
+      if (walletType === 'metamask') {
         return await this.metaMaskWallet.connect();
       }
 
@@ -52,13 +44,8 @@ export class UnifiedWalletService {
     this.currentWalletType = null
     console.log('🔄 UnifiedWallet state reset immediately')
     
-    // Trigger wallet-specific disconnect in background (non-blocking)
-    if (walletType === 'near') {
-      console.log('📱 Triggering NEAR wallet disconnect...')
-      this.nearWallet.disconnectWallet().catch(error => {
-        console.warn('⚠️ NEAR wallet background disconnect error:', error)
-      })
-    } else if (walletType === 'metamask') {
+    // Trigger MetaMask disconnect in background (non-blocking)
+    if (walletType === 'metamask') {
       console.log('🦊 Triggering MetaMask wallet disconnect...')
       this.metaMaskWallet.disconnect().catch(error => {
         console.warn('⚠️ MetaMask wallet background disconnect error:', error)
@@ -71,9 +58,7 @@ export class UnifiedWalletService {
   }
 
   isWalletConnected(): boolean {
-    if (this.currentWalletType === 'near') {
-      return this.nearWallet.isConnected();
-    } else if (this.currentWalletType === 'metamask') {
+    if (this.currentWalletType === 'metamask') {
       return this.metaMaskWallet.isConnected();
     }
     
@@ -81,9 +66,7 @@ export class UnifiedWalletService {
   }
 
   getAccountId(): string | null {
-    if (this.currentWalletType === 'near') {
-      return this.nearWallet.getAccountId();
-    } else if (this.currentWalletType === 'metamask') {
+    if (this.currentWalletType === 'metamask') {
       return this.metaMaskWallet.getAccountId();
     }
     
@@ -91,17 +74,7 @@ export class UnifiedWalletService {
   }
 
   getAccount(): UnifiedWalletAccount | null {
-    if (this.currentWalletType === 'near') {
-      const accountId = this.nearWallet.getAccountId();
-      if (!accountId) return null;
-      
-      return {
-        address: accountId,
-        balance: '0', // Will be fetched separately
-        isConnected: true,
-        walletType: 'near',
-      };
-    } else if (this.currentWalletType === 'metamask') {
+    if (this.currentWalletType === 'metamask') {
       const account = this.metaMaskWallet.getAccount();
       if (!account) return null;
       
@@ -117,9 +90,7 @@ export class UnifiedWalletService {
   }
 
   async getAccountBalance(): Promise<string> {
-    if (this.currentWalletType === 'near') {
-      return await this.nearWallet.getAccountBalance();
-    } else if (this.currentWalletType === 'metamask') {
+    if (this.currentWalletType === 'metamask') {
       return await this.metaMaskWallet.getBalance();
     }
     
@@ -134,17 +105,16 @@ export class UnifiedWalletService {
     return await this.metaMaskWallet.isInstalled();
   }
 
-  async switchToNearNetwork(): Promise<boolean> {
+  async switchToEthereumNetwork(): Promise<boolean> {
     if (this.currentWalletType === 'metamask') {
-      return await this.metaMaskWallet.switchToNearNetwork();
+      // MetaMask is already on Ethereum network
+      return true;
     }
     return false;
   }
 
   async signMessage(message: string): Promise<string | null> {
-    if (this.currentWalletType === 'near') {
-      return await this.nearWallet.signMessage(message);
-    } else if (this.currentWalletType === 'metamask') {
+    if (this.currentWalletType === 'metamask') {
       return await this.metaMaskWallet.signMessage(message);
     }
     

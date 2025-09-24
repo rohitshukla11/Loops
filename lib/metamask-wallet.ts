@@ -1,4 +1,4 @@
-// Simple MetaMask integration for NEAR
+// MetaMask integration for Ethereum
 export interface MetaMaskAccount {
   address: string;
   balance: string;
@@ -97,27 +97,32 @@ export class MetaMaskWalletService {
     }
   }
 
-  async switchToNearNetwork(): Promise<boolean> {
+  async switchToEthereumMainnet(): Promise<boolean> {
     try {
-      // Add NEAR testnet to MetaMask
+      // Switch to Ethereum mainnet
       await window.ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: '0x4e454152', // NEAR testnet chain ID
-          chainName: 'NEAR Testnet',
-          rpcUrls: ['https://rpc.testnet.near.org'],
-          nativeCurrency: {
-            name: 'NEAR',
-            symbol: 'NEAR',
-            decimals: 24,
-          },
-          blockExplorerUrls: ['https://explorer.testnet.near.org'],
-        }],
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x1' }], // Ethereum mainnet chain ID
       });
 
       return true;
     } catch (error) {
-      console.error('Failed to switch to NEAR network:', error);
+      console.error('Failed to switch to Ethereum mainnet:', error);
+      return false;
+    }
+  }
+
+  async switchToEthereumSepolia(): Promise<boolean> {
+    try {
+      // Switch to Ethereum Sepolia testnet
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xaa36a7' }], // Ethereum Sepolia testnet chain ID
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to switch to Ethereum Sepolia:', error);
       return false;
     }
   }

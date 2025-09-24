@@ -30,7 +30,7 @@ export default function Home() {
   const [lastTransactionUrl, setLastTransactionUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'memories' | 'calendar'>('memories')
   
-  // Personal AI is now the default and only mode
+  // BetterHalf.ai is now the default and only mode
   const [personalizedMessages, setPersonalizedMessages] = useState<ChatMessage[]>([])
   const [showProfileManagement, setShowProfileManagement] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -191,11 +191,21 @@ export default function Home() {
 
       const data = await response.json();
       
+      // Log detailed response information
+      console.log('🤖 AI Response received:', {
+        contentLength: data.content?.length || 0,
+        hasGolemUrl: !!data.golemExplorerUrl,
+        golemUrl: data.golemExplorerUrl,
+        shouldStore: data.shouldStore,
+        timestamp: new Date().toISOString()
+      });
+      
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: data.content,
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        golemExplorerUrl: data.golemExplorerUrl
       }
 
       const updatedMessages = [...personalizedMessages, userMessage, assistantMessage]
@@ -226,14 +236,47 @@ export default function Home() {
       }
 
     } catch (error: any) {
-      console.error('Failed to send personalized message:', error)
+      console.error('❌ DETAILED CHAT ERROR:', error);
+      
+      // Detailed error analysis for chat
+      const errorDetails = {
+        errorType: error.constructor.name,
+        message: error.message,
+        userInput: content.substring(0, 100) + '...',
+        timestamp: new Date().toISOString(),
+        responseStatus: 'FAILED'
+      };
+      
+      console.error('🔍 CHAT ERROR ANALYSIS:', JSON.stringify(errorDetails, null, 2));
+      
+      // Specific error guidance
+      if (error.message.includes('Failed to get personalized response')) {
+        console.error('🤖 PERSONALIZED RESPONSE FAILED');
+        console.error('   - The AI service failed to generate a response');
+        console.error('   - Check the API endpoint and service status');
+        console.error('   - Verify OpenAI API configuration');
+      }
+      
+      if (error.message.includes('Learning interaction failed')) {
+        console.error('🧠 LEARNING FAILED');
+        console.error('   - The AI cannot learn from this interaction');
+        console.error('   - Check Golem Base connectivity and memory service');
+        console.error('   - The response will be generated but not stored');
+      }
+      
+      if (error.message.includes('Memory upload to Golem Base failed')) {
+        console.error('🌐 GOLEM BASE UPLOAD FAILED');
+        console.error('   - The memory cannot be stored on the blockchain');
+        console.error('   - Check network connectivity and RPC endpoint');
+        console.error('   - Verify Golem Base configuration');
+      }
       
       if (error.message.includes('API key')) {
         toast.error('OpenAI API key is not configured properly. Please check your environment variables.')
       } else if (error.message.includes('429')) {
         toast.error('Rate limit exceeded. Please try again in a moment.')
       } else {
-        toast.error(error.message || 'Failed to get personalized response. Please try again.')
+        toast.error(`Error: ${error.message}. Check console for detailed analysis.`)
       }
     } finally {
       setIsLoading(false)
@@ -244,10 +287,10 @@ export default function Home() {
 
   const clearChat = async () => {
     try {
-      console.log('🗑️ Clearing Personal AI chat...')
-      setPersonalizedMessages([])
-      setPersonalizedInsights(null)
-      console.log('✅ Personal AI chat cleared successfully')
+    console.log('🗑️ Clearing BetterHalf.ai chat...')
+    setPersonalizedMessages([])
+    setPersonalizedInsights(null)
+    console.log('✅ BetterHalf.ai chat cleared successfully')
     } catch (error) {
       console.error('Failed to clear chat:', error)
     }
@@ -309,7 +352,7 @@ export default function Home() {
     }
   }
 
-  // Load profile and insights on mount (Personal AI is always active)
+  // Load profile and insights on mount (BetterHalf.ai is always active)
   useEffect(() => {
     loadUserProfile()
     refreshPersonalizedInsights()
@@ -422,7 +465,7 @@ export default function Home() {
       )}
       
       <main className="flex-1 flex flex-col xl:flex-row w-full overflow-hidden">
-        {/* Personal AI Chat Interface - 60% Width */}
+                {/* BetterHalf.ai Chat Interface - 60% Width */}
         <div className="w-full xl:w-3/5 flex flex-col min-w-0 bg-white border-r border-gray-200 overflow-hidden">
           <PersonalizedChatInterface
             messages={personalizedMessages}

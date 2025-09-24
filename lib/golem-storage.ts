@@ -1,5 +1,6 @@
 import { MemoryEntry, MemoryMetadata } from '@/types/memory';
 import { createClient, AccountData, Tagged, GolemBaseCreate, Annotation, GolemBaseUpdate } from 'golem-base-sdk';
+import { keccak256 } from 'viem';
 import { randomUUID } from 'crypto';
 
 // Golem Base configuration
@@ -15,6 +16,8 @@ interface GolemUploadResult {
   size: number;
   timestamp: number;
   chainId: number;
+  transactionUrl?: string;
+  transactionHash?: string;
 }
 
 interface GolemRetrieveResult {
@@ -31,6 +34,9 @@ export class GolemStorageService {
   private encoder = new TextEncoder();
   private decoder = new TextDecoder();
   private entityKeys: Set<string> = new Set(); // Track entity keys locally
+  private currentNonce: number | null = null;
+  private nonceLock = false;
+  private txLock = false;
 
   constructor(config: GolemConfig) {
     this.config = config;
@@ -61,13 +67,33 @@ export class GolemStorageService {
         Buffer.from(this.config.privateKey.replace('0x', ''), 'hex')
       );
 
-      // Initialize the Golem Base client using the SDK
-      this.client = await createClient(
-        this.config.chainId,
-        key,
-        this.config.rpcUrl,
-        this.config.wsUrl,
-      );
+      // Initialize the Golem Base client using the SDK with retry logic
+      console.log('🔧 Initializing Golem Base client with retry logic...');
+      
+      let initAttempts = 0;
+      const maxInitAttempts = 3;
+      
+      while (initAttempts < maxInitAttempts) {
+        try {
+          this.client = await createClient(
+            this.config.chainId,
+            key,
+            this.config.rpcUrl,
+            this.config.wsUrl,
+          );
+          break; // Success, exit retry loop
+        } catch (error: any) {
+          initAttempts++;
+          console.warn(`⚠️  Golem Base client initialization attempt ${initAttempts}/${maxInitAttempts} failed:`, error?.message);
+          
+          if (initAttempts >= maxInitAttempts) {
+            throw new Error(`Failed to initialize Golem Base client after ${maxInitAttempts} attempts: ${error?.message}`);
+          }
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 2000 * initAttempts));
+        }
+      }
 
       this.isInitialized = true;
       console.log('✅ Golem Base storage service initialized successfully');
@@ -80,7 +106,7 @@ export class GolemStorageService {
       
       // Debug: Log available methods for troubleshooting
       this.debugClientMethods();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initialize Golem Base storage:', error);
       throw new Error('Golem Base storage initialization failed');
     }
@@ -139,6 +165,148 @@ export class GolemStorageService {
     }
   }
 
+  private async getCurrentNonce(): Promise<number> {
+    try {
+      const response = await fetch(this.config.rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': '*/*',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getTransactionCount',
+          // Use 'pending' to include pending transactions in nonce calculation
+          params: ['0x68343Aa0598b7FCAA102769D172e59cdDfae10f2', 'pending'],
+          id: 1
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(`RPC Error: ${data.error.message}`);
+      }
+
+      const nonce = parseInt(data.result, 16);
+      console.log(`📊 Current nonce: ${nonce}`);
+      return nonce;
+    } catch (error: any) {
+      console.warn(`⚠️ Failed to get nonce: ${error.message}`);
+      return 0; // Fallback to 0
+    }
+  }
+
+  private async testRpcConnection(): Promise<void> {
+    try {
+      // Test basic RPC connectivity with improved error handling
+      const response = await fetch(this.config.rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': '*/*',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_chainId',
+          params: [],
+          id: 1
+        }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`RPC test failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(`RPC error: ${data.error.message}`);
+      }
+
+      console.log('✅ RPC connection test successful');
+    } catch (error: any) {
+      console.warn('⚠️ RPC connection test failed:', error.message);
+      throw error;
+    }
+  }
+
+  private async testRpcConnectionWithRetry(): Promise<void> {
+    let attempts = 0;
+    const maxAttempts = 2; // Reduced attempts for faster fallback
+    
+    while (attempts < maxAttempts) {
+      try {
+        await this.testRpcConnection();
+        return; // Success, exit retry loop
+      } catch (error: any) {
+        attempts++;
+        console.warn(`⚠️  RPC connection attempt ${attempts}/${maxAttempts} failed:`, error.message);
+        
+        if (attempts >= maxAttempts) {
+          console.warn(`🌐 Golem Base RPC test failed after ${maxAttempts} attempts, but continuing with initialization`);
+          // Don't throw error, just warn and continue - the actual operations might still work
+          return;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const delay = 1000 * Math.pow(2, attempts - 1); // 1s, 2s
+        console.log(`🔄 Retrying RPC connection in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  private async waitForNonceAvailability(): Promise<void> {
+    // Wait for nonce lock to be released
+    while (this.nonceLock) {
+      console.log('⏳ Waiting for nonce lock to be released...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Acquire nonce lock
+    this.nonceLock = true;
+    
+    try {
+      // Get current nonce
+      const currentNonce = await this.getCurrentNonce();
+      
+      // If we have a stored nonce, make sure it's not behind
+      if (this.currentNonce !== null && this.currentNonce < currentNonce) {
+        console.log(`📊 Updating nonce from ${this.currentNonce} to ${currentNonce}`);
+        this.currentNonce = currentNonce;
+      } else if (this.currentNonce === null) {
+        this.currentNonce = currentNonce;
+      }
+      
+      // Increment nonce for this transaction
+      this.currentNonce++;
+      console.log(`📊 Using nonce: ${this.currentNonce}`);
+      
+    } finally {
+      // Release nonce lock after a delay
+      setTimeout(() => {
+        this.nonceLock = false;
+      }, 3000); // 3 second delay to prevent rapid nonce reuse
+    }
+  }
+
+  private async acquireTxLock(): Promise<void> {
+    while (this.txLock) {
+      console.log('⏳ Waiting for previous transaction to finish...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    this.txLock = true;
+  }
+
+  private releaseTxLock(): void {
+    this.txLock = false;
+  }
+
   async uploadMemory(memory: MemoryEntry): Promise<GolemUploadResult> {
     if (!this.isInitialized) {
       await this.initialize();
@@ -149,6 +317,16 @@ export class GolemStorageService {
     }
 
     try {
+      // Ensure only one transaction is sent at a time to avoid nonce replacement errors
+      await this.acquireTxLock();
+
+      // Test RPC connectivity first with retry logic
+      await this.testRpcConnectionWithRetry();
+      
+      // Wait for nonce availability to prevent nonce conflicts
+      await this.waitForNonceAvailability();
+      
+      // Proceed immediately to entity creation (no artificial delay)
       // Prepare the memory data for upload
       const memoryData = {
         id: memory.id,
@@ -165,6 +343,15 @@ export class GolemStorageService {
 
       const content = this.encoder.encode(JSON.stringify(memoryData));
       const contentHex = '0x' + Buffer.from(content).toString('hex');
+
+      // Check transaction size before sending
+      const transactionSize = contentHex.length;
+      const MAX_TX_SIZE = 200000; // 200KB limit for transaction data
+      if (transactionSize > MAX_TX_SIZE) {
+        throw new Error(`Transaction too large: ${transactionSize} bytes (max: ${MAX_TX_SIZE}). Content size: ${content.length} bytes. Please reduce memory content size.`);
+      }
+
+      console.log(`📊 Transaction size: ${transactionSize} bytes (${(transactionSize / 1024).toFixed(1)} KB)`);
 
       // Create annotations for the memory
       const annotations: Annotation<string>[] = [
@@ -187,13 +374,71 @@ export class GolemStorageService {
         numericAnnotations: []
       };
 
-      const result = await this.client.createEntities([createData]);
+      // 🎯 SOLUTION: Use the official txHashCallback from Golem Base SDK
+      let transactionHash: string | undefined;
       
-      if (!result || result.length === 0) {
+      console.log('🚀 Using official Golem Base SDK txHashCallback for immediate TX hash capture...');
+      
+      // Create the entity using sendTransaction with txHashCallback
+      const result = await this.client.sendTransaction([createData], undefined, undefined, undefined, {
+        txHashCallback: (txHash: `0x${string}`) => {
+          transactionHash = txHash;
+          const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+          const immediateUrl = `${explorerUrl}/tx/${txHash}`;
+          
+          console.log(`🎯 OFFICIAL TX HASH CAPTURED: ${txHash}`);
+          console.log(`🚀 IMMEDIATE TX URL: ${immediateUrl}`);
+          console.log(`✅ Transaction submitted! You can check its status immediately at: ${immediateUrl}`);
+        }
+      });
+      
+      // Update the entity with transaction hash if captured
+      if (transactionHash && result.createEntitiesReceipts && result.createEntitiesReceipts.length > 0) {
+        try {
+          console.log('📝 Updating entity with transaction hash...');
+          
+          // Add transaction hash to memory data
+          const updatedMemoryData = {
+            ...memoryData,
+            transactionHash: transactionHash,
+            explorerUrl: `${process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io'}/tx/${transactionHash}`
+          };
+          
+          const updatedContent = this.encoder.encode(JSON.stringify(updatedMemoryData));
+          
+          // Add transaction hash to annotations
+          const updatedAnnotations: Annotation<string>[] = [
+            ...annotations,
+            { key: 'transactionHash', value: transactionHash },
+            { key: 'explorerUrl', value: `${process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io'}/tx/${transactionHash}` }
+          ];
+          
+          // Update the entity with the transaction hash
+          const updateData: GolemBaseUpdate = {
+            entityKey: result.createEntitiesReceipts[0].entityKey as `0x${string}`,
+            data: Buffer.from(updatedContent),
+            btl: 1000,
+            stringAnnotations: updatedAnnotations,
+            numericAnnotations: []
+          };
+          
+          await this.client.updateEntities([updateData]);
+          console.log('✅ Entity updated with transaction hash successfully!');
+          
+        } catch (updateError: any) {
+          console.warn('⚠️ Failed to update entity with transaction hash:', updateError.message);
+          // Continue execution - the entity was created successfully, just without the hash update
+        }
+      }
+      
+      // Extract createEntities results from sendTransaction response
+      const entityResults = result.createEntitiesReceipts;
+      
+      if (!entityResults || entityResults.length === 0) {
         throw new Error('Failed to create entity - no result returned');
       }
 
-      const entityResult = result[0];
+      const entityResult = entityResults[0];
 
       // Track the entity key locally
       this.entityKeys.add(entityResult.entityKey);
@@ -201,23 +446,79 @@ export class GolemStorageService {
       // Save to localStorage for persistence
       this.saveEntityKeysToStorage();
 
-      // Generate transaction URL for Golem Base
+      // Generate transaction URL using the captured transaction hash
       const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
-      const txUrl = `${explorerUrl}/entity/${entityResult.entityKey}`;
+      const txUrl = transactionHash ? `${explorerUrl}/tx/${transactionHash}` : undefined;
+      
+      if (transactionHash) {
+        console.log(`🔗 Final Transaction URL: ${txUrl}`);
+        console.log(`✅ Official SDK transaction hash captured successfully!`);
+        console.log(`📋 Transaction Hash: ${transactionHash}`);
+        console.log(`🔍 View in account history: ${explorerUrl}/address/${this.config.ownerAddress}?tab=txs`);
+      } else {
+        console.warn(`⚠️ Transaction hash was not captured via txHashCallback`);
+      }
       
       console.log(`✅ Memory uploaded successfully!`);
       console.log(`📋 Upload result:`, entityResult);
-      console.log(`🔗 Transaction URL: ${txUrl}`);
 
       return {
         entityKey: entityResult.entityKey,
         size: content.length,
         timestamp: Date.now(),
-        chainId: this.config.chainId
+        chainId: this.config.chainId,
+        transactionUrl: txUrl,
+        transactionHash: transactionHash || undefined
       };
-    } catch (error) {
-      console.error('Failed to upload memory to Golem Base:', error);
-      throw new Error('Memory upload to Golem Base failed');
+    } catch (error: any) {
+      console.error('❌ DETAILED GOLEM BASE UPLOAD ERROR:', error);
+      
+      // Detailed error analysis
+      const errorDetails = {
+        errorType: error.constructor.name,
+        message: error?.message,
+        code: error?.code || 'UNKNOWN',
+        cause: error.cause ? {
+          type: error.cause.constructor.name,
+          message: error.cause.message,
+          code: error.cause.code || 'UNKNOWN'
+        } : null,
+        stack: error?.stack,
+        config: {
+          rpcUrl: this.config.rpcUrl,
+          chainId: this.config.chainId,
+          isInitialized: this.isInitialized,
+          clientExists: !!this.client
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      console.error('🔍 ERROR ANALYSIS:', JSON.stringify(errorDetails, null, 2));
+      
+      // Network-specific error analysis
+      if (error?.message?.includes('fetch failed')) {
+        console.error('🌐 NETWORK ERROR: The RPC endpoint is unreachable');
+        console.error('   - Check if the RPC URL is correct:', this.config.rpcUrl);
+        console.error('   - Verify network connectivity');
+        console.error('   - Check if the Golem Base service is running');
+      }
+      
+      if (error?.message?.includes('ETIMEDOUT')) {
+        console.error('⏰ TIMEOUT ERROR: Request timed out');
+        console.error('   - The RPC server is not responding within the timeout period');
+        console.error('   - This could indicate server overload or network issues');
+      }
+      
+      if (error?.message?.includes('HTTP request failed')) {
+        console.error('🚫 HTTP ERROR: The RPC server returned an error');
+        console.error('   - Check the server status');
+        console.error('   - Verify the request format');
+      }
+      
+      throw new Error(`Memory upload to Golem Base failed: ${error?.message}`);
+    }
+    finally {
+      this.releaseTxLock();
     }
   }
 
@@ -419,26 +720,28 @@ export class GolemStorageService {
     try {
       console.log(`🔍 Searching memories with query: "${query}", owner: ${owner}, limit: ${limit}`);
 
-      // Use the efficient owner-based method to get owned entities
-      console.log('🔍 Starting queryEntities with empty query...');
-      const entities = await this.queryEntities('');
+      // Directly get owned entities using getEntitiesOfOwner (most efficient!)
+      console.log('🔍 Getting owned entities directly...');
+      const ownerAddress = process.env.NEXT_PUBLIC_GOLEM_ADDRESS || '0x68343Aa0598b7FCAA102769D172e59cdDfae10f2';
+      console.log('📊 Owner address from env:', ownerAddress);
       
-      console.log(`🔍 Query entities result:`, entities);
-      console.log(`🔍 Number of entities found:`, entities?.length || 0);
+      const entityKeys = await this.client.getEntitiesOfOwner(ownerAddress);
+      console.log(`📊 Entity keys result:`, entityKeys);
+      console.log(`📊 Number of entity keys:`, entityKeys?.length || 0);
       
-      if (!entities || entities.length === 0) {
+      if (!entityKeys || entityKeys.length === 0) {
         console.log('🔍 No owned entities found - this is normal for a fresh installation');
         return [];
       }
 
-      console.log(`📊 Found ${entities.length} owned entities from Golem Base, filtering for memories...`);
+      console.log(`📊 Found ${entityKeys.length} owned entities from Golem Base, filtering for memories...`);
 
       const memories: MemoryEntry[] = [];
       
-      // Process entities to find our memories
-      for (const entity of entities) {
+      // Process entity keys to find our memories
+      for (const entityKey of entityKeys) {
         try {
-          const memory = await this.retrieveMemory(entity.entityKey);
+          const memory = await this.retrieveMemory(entityKey);
           if (memory) {
             // Filter by owner if specified
             if (owner && memory.accessPolicy.owner !== owner) {
@@ -484,10 +787,11 @@ export class GolemStorageService {
     try {
       console.log(`🔍 Querying Golem Base with query: "${query}"`);
       
-      // If no query provided, get owned entities using getOwnedEntityKeys (much more efficient!)
+      // If no query provided, get owned entities directly (most efficient!)
       if (!query || query.trim() === '') {
         console.log('🔍 Empty query detected, getting owned entities...');
-        const entityKeys = await this.getOwnedEntityKeys();
+        const ownerAddress = process.env.NEXT_PUBLIC_GOLEM_ADDRESS || '0x68343Aa0598b7FCAA102769D172e59cdDfae10f2';
+        const entityKeys = await this.client.getEntitiesOfOwner(ownerAddress);
         
         // Convert entity keys to the expected format
         const entities = [];
@@ -557,46 +861,6 @@ export class GolemStorageService {
   }
 
   // Get entity keys owned by the current address - much more efficient!
-  async getOwnedEntityKeys(): Promise<string[]> {
-    try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      if (!this.client) {
-        throw new Error('Golem Base client not initialized');
-      }
-
-      console.log('📊 Fetching entity keys owned by current address...');
-      
-      // Get the owner address first
-      const ownerAddress = await this.client.getOwnerAddress();
-      console.log('📊 Owner address:', ownerAddress);
-      
-      // Use getEntitiesOfOwner for much more efficient retrieval
-      console.log('📊 Calling getEntitiesOfOwner...');
-      const entityKeys = await this.client.getEntitiesOfOwner(ownerAddress);
-      console.log('📊 Entity keys result:', entityKeys);
-      console.log('📊 Number of entity keys:', entityKeys?.length || 0);
-      
-      console.log(`📊 Retrieved ${entityKeys.length} entity keys owned by ${ownerAddress}`);
-      
-      // Update our local tracking with the owned keys
-      this.entityKeys.clear();
-      entityKeys.forEach((key: string) => this.entityKeys.add(key));
-      
-      // Save to localStorage for persistence
-      this.saveEntityKeysToStorage();
-      
-      return entityKeys;
-    } catch (error) {
-      console.error('Failed to get owned entity keys from Golem Base:', error);
-      
-      // Fallback to local tracking if API fails
-      console.log(`📊 Falling back to local entity key tracking: ${this.entityKeys.size} entities tracked`);
-      return Array.from(this.entityKeys);
-    }
-  }
 
   async getStorageStats(): Promise<{
     totalMemories: number;
@@ -620,8 +884,9 @@ export class GolemStorageService {
     try {
       console.log(`📊 Getting storage statistics...`);
 
-      // Get owned entity keys and sample them to estimate memory count and size
-      const entityKeys = await this.getOwnedEntityKeys();
+      // Get owned entity keys directly to estimate memory count and size
+      const ownerAddress = process.env.NEXT_PUBLIC_GOLEM_ADDRESS || '0x68343Aa0598b7FCAA102769D172e59cdDfae10f2';
+      const entityKeys = await this.client.getEntitiesOfOwner(ownerAddress);
       
       if (!entityKeys || entityKeys.length === 0) {
         return {

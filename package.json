@@ -1,5 +1,5 @@
 {
-  "name": "privacy-first-ai-memory",
+  "name": "betterhalf-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:golem": "npx tsx lib/test-golem.ts",
+    "test:golem": "node test-golem.js",
+    "test:config": "node test-config.js",
+    "test:explorer": "node test-explorer.js",
+    "test:memory": "node test-memory.js",
     "test:openai": "npx tsx test-openai.ts",
     "contract:build": "cd contracts && npm run build",
     "contract:deploy": "cd contracts && npm run deploy",

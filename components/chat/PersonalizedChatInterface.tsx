@@ -11,6 +11,7 @@ interface ChatMessage {
   timestamp: Date
   memoryId?: string
   insights?: PersonalInsights
+  golemExplorerUrl?: string
 }
 
 interface PersonalInsights {
@@ -205,9 +206,9 @@ export function PersonalizedChatInterface({
             <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Heart className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Welcome to Your Personal AI! 💜</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">Welcome to BetterHalf.ai! 💜</h3>
             <p className="text-slate-600 max-w-md mx-auto">
-              I'm here to help you optimize your schedule, suggest healthy meals, find workout times, and support you through your day. 
+              I'm your AI companion, here to help you optimize your schedule, suggest healthy meals, find workout times, and support you through your day. 
               I understand your patterns and will never judge - just care about your wellbeing.
             </p>
           </div>
@@ -247,13 +248,34 @@ export function PersonalizedChatInterface({
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                <p
-                  className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-blue-100' : 'text-slate-500'
-                  }`}
-                >
-                  {formatTime(message.timestamp)}
-                </p>
+                <div className="mt-2 flex items-center justify-between">
+                  <p
+                    className={`text-xs ${
+                      message.role === 'user' ? 'text-blue-100' : 'text-slate-500'
+                    }`}
+                  >
+                    {formatTime(message.timestamp)}
+                  </p>
+                  {message.golemExplorerUrl && (
+                    <div className="flex flex-col space-y-1">
+                      <a
+                        href={message.golemExplorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
+                        title="View memory on Golem DB explorer"
+                      >
+                        <span>🔗</span>
+                        <span>
+                          {message.golemExplorerUrl.includes('/tx/') ? 'View TX on Golem DB' : 'View Entity on Golem DB'}
+                        </span>
+                      </a>
+                      <div className="text-xs text-gray-500">
+                        {(message.golemExplorerUrl.includes('/tx/') ? 'Tx' : 'Key')}: {message.golemExplorerUrl.split('/').pop()?.substring(0, 10)}...
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

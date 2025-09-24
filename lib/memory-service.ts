@@ -1,6 +1,7 @@
 import { MemoryEntry, MemoryType, AccessPolicy, MemorySearchQuery, MemorySearchResult, Permission } from '@/types/memory';
 import { getGolemStorage } from './golem-storage';
 import { getEncryptionService } from './encryption';
+import { getKeyManagementService } from './key-management';
 // Hash utilities moved inline to avoid dependencies
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,9 +9,9 @@ export class MemoryService {
   // Note: IPFS storage removed - using Golem Base only
   private golemStorage = getGolemStorage({
     privateKey: process.env.NEXT_PUBLIC_GOLEM_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000',
-    chainId: parseInt(process.env.NEXT_PUBLIC_GOLEM_CHAIN_ID || '60138453025'),
-    rpcUrl: process.env.NEXT_PUBLIC_GOLEM_RPC_URL || 'https://kaolin.holesky.golemdb.io/rpc',
-    wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL || 'wss://kaolin.holesky.golemdb.io/rpc/ws',
+    chainId: parseInt(process.env.NEXT_PUBLIC_GOLEM_CHAIN_ID || '60138453033'),
+    rpcUrl: process.env.NEXT_PUBLIC_GOLEM_RPC_URL || 'https://ethwarsaw.holesky.golemdb.io/rpc',
+    wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL || 'wss://ethwarsaw.holesky.golemdb.io/rpc/ws',
   });
   
   constructor() {
@@ -21,17 +22,46 @@ export class MemoryService {
       rpcUrl: process.env.NEXT_PUBLIC_GOLEM_RPC_URL,
       wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL
     });
+    
+    // Initialize key management with default password for basic functionality
+    this.initializeKeyManagement();
+  }
+
+  private async initializeKeyManagement(): Promise<void> {
+    try {
+      // Use a default password for basic functionality
+      // In a production app, this should be user-provided
+      const defaultPassword = process.env.NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD || 'default-encryption-key-2024';
+      await this.keyManagement.initializeWithPassword(defaultPassword);
+      console.log('🔐 Key management initialized with default password');
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize key management:', error);
+    }
   }
   private encryptionService = getEncryptionService();
+  private keyManagement = getKeyManagementService();
   // Note: NEAR wallet removed - using Ethereum wallet for Golem Base only
   
   // Request throttling
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessing = false;
   private lastRequestTime = 0;
-  private readonly REQUEST_DELAY = 1000; // 1 second between requests
+  private readonly REQUEST_DELAY = 3000; // 3 seconds between requests to prevent nonce conflicts
   
   // Note: Local indexing removed - using direct Golem Base queries instead
+
+  private async throttleRequest(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.REQUEST_DELAY) {
+      const delay = this.REQUEST_DELAY - timeSinceLastRequest;
+      console.log(`⏳ Throttling request: waiting ${delay}ms to prevent RPC overload...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    this.lastRequestTime = Date.now();
+  }
 
   async initialize(): Promise<void> {
     try {
@@ -115,14 +145,18 @@ export class MemoryService {
     tags?: string[];
     accessPolicy?: Partial<AccessPolicy>;
     encrypted?: boolean;
-  }): Promise<MemoryEntry> {
+  }): Promise<MemoryEntry & { transactionUrl?: string }> {
     const { content, type, category, tags = [], accessPolicy, encrypted = true } = memoryData;
+    
+    // Add throttling to prevent RPC overload
+    await this.throttleRequest();
     const memoryId = uuidv4();
     const now = new Date();
 
-    // Create access policy (use a default owner for Golem Base)
+    // Create access policy using actual Ethereum address
+    const ownerAddress = process.env.NEXT_PUBLIC_GOLEM_ADDRESS || '0x68343Aa0598b7FCAA102769D172e59cdDfae10f2';
     const policy: AccessPolicy = {
-      owner: 'ethereum-wallet', // Golem Base uses Ethereum wallet
+      owner: ownerAddress, // Use actual Ethereum wallet address
       permissions: accessPolicy?.permissions || [],
       timelock: accessPolicy?.timelock,
       threshold: accessPolicy?.threshold,
@@ -131,15 +165,31 @@ export class MemoryService {
     // Encrypt memory content client-side (AES-256-GCM)
     let encryptedContent = content;
     let encryptionKeyId: string | undefined;
+    let encryptionSalt: string | undefined;
 
     if (encrypted) {
-      const encryptionKey = this.encryptionService.generateKeyPair();
-      const encryptedData = await this.encryptionService.encrypt(content, encryptionKey.keyId);
+      // Check if key management is initialized
+      if (!this.keyManagement.isInitialized()) {
+        throw new Error('Key management not initialized. Please set up encryption password first.');
+      }
+
+      // Generate memory-specific key from master password
+      const encryptionKey = await this.keyManagement.generateMemoryKey(memoryId);
+      const encryptedData = await this.encryptionService.encrypt(content, encryptionKey.keyId, this.keyManagement);
       encryptedContent = JSON.stringify(encryptedData);
       encryptionKeyId = encryptionKey.keyId;
+      encryptionSalt = encryptionKey.salt;
       
-      // Save keys to localStorage for persistence
-      this.encryptionService.saveKeysToStorage();
+      console.log(`🔐 Generated memory-specific encryption key for ${memoryId}`);
+      console.log(`🔑 Key ID: ${encryptionKey.keyId}, Salt: ${encryptionKey.salt}`);
+    }
+
+    // Check if encrypted content is too large for Golem Base transaction
+    const MAX_CONTENT_SIZE = 10000; // 10KB limit for transaction data
+    if (encryptedContent.length > MAX_CONTENT_SIZE) {
+      console.warn(`⚠️ Memory content too large (${encryptedContent.length} bytes), truncating...`);
+      const truncatedContent = encryptedContent.substring(0, MAX_CONTENT_SIZE - 100) + '...[TRUNCATED]';
+      encryptedContent = truncatedContent;
     }
 
     // Generate SHA256 hash of encrypted memory
@@ -163,6 +213,8 @@ export class MemoryService {
         checksum: this.generateChecksum(encryptedContent),
         version: 1,
         relatedMemories: [],
+        encryptionKeyId: encryptionKeyId, // Store the encryption key ID for decryption
+        encryptionSalt: encryptionSalt, // Store the encryption salt for key regeneration
       },
     };
 
@@ -174,13 +226,58 @@ export class MemoryService {
       console.log(`Memory created successfully with Golem Base: ${memoryId}`);
       console.log(`Golem Base Entity Key: ${uploadResult.entityKey}, Size: ${uploadResult.size} bytes`);
       console.log(`Memory Hash: ${memoryHash}`);
-      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
-      console.log(`🔗 Transaction URL: ${explorerUrl}/entity/${uploadResult.entityKey}`);
       
-      return memory;
-    } catch (error) {
-      console.error('Failed to create memory:', error);
-      throw error;
+      // Only use transaction URL if present (no entity fallback)
+      const transactionUrl = uploadResult.transactionUrl;
+      if (!transactionUrl) {
+        console.warn('⚠️ No transaction hash captured for this memory; not returning an explorer URL.');
+      } else {
+        console.log(`🔗 Transaction URL: ${transactionUrl}`);
+      }
+      
+      return {
+        ...memory,
+        transactionUrl
+      };
+    } catch (error: any) {
+      console.error('❌ DETAILED MEMORY CREATION ERROR:', error);
+      
+      // Detailed error analysis for memory creation
+      const errorDetails = {
+        errorType: error.constructor.name,
+        message: error.message,
+        memoryId: memoryId,
+        memoryType: type,
+        memoryCategory: category,
+        contentLength: content.length,
+        encrypted: encrypted,
+        timestamp: new Date().toISOString(),
+        golemConfig: {
+          privateKey: process.env.NEXT_PUBLIC_GOLEM_PRIVATE_KEY ? 'SET' : 'NOT SET',
+          chainId: process.env.NEXT_PUBLIC_GOLEM_CHAIN_ID,
+          rpcUrl: process.env.NEXT_PUBLIC_GOLEM_RPC_URL,
+          wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL
+        }
+      };
+      
+      console.error('🔍 MEMORY CREATION ERROR ANALYSIS:', JSON.stringify(errorDetails, null, 2));
+      
+      // Specific error guidance
+      if (error?.message?.includes('Memory upload to Golem Base failed')) {
+        console.error('🚨 GOLEM BASE UPLOAD FAILED');
+        console.error('   - The underlying Golem Base storage service failed');
+        console.error('   - Check the detailed error above for root cause');
+        console.error('   - Verify Golem Base configuration and connectivity');
+      }
+      
+      if (error?.message?.includes('Golem Base client not initialized')) {
+        console.error('🔧 CLIENT INITIALIZATION ERROR');
+        console.error('   - The Golem Base client failed to initialize');
+        console.error('   - Check private key and RPC configuration');
+        console.error('   - Verify network connectivity to RPC endpoint');
+      }
+      
+      throw new Error(`Memory creation failed: ${error?.message}`);
     }
   }
 
@@ -201,17 +298,61 @@ export class MemoryService {
       // Decrypt memory content if encrypted
       if (memory.encrypted) {
         try {
-          const keys = this.encryptionService.getKeys();
-          if (keys.length > 0) {
-            const encryptedData = JSON.parse(memory.content);
-            const decrypted = await this.encryptionService.decrypt(encryptedData, keys[0].keyId);
-            memory.content = decrypted.content;
-            console.log(`✅ Memory decrypted successfully for ${memoryId}`);
+          console.log(`🔐 Starting decryption for memory ${memoryId}`);
+          
+          // Check if key management is initialized
+          if (!this.keyManagement.isInitialized()) {
+            console.warn(`⚠️ Key management not initialized - cannot decrypt memory ${memoryId}`);
+            return memory; // Return encrypted content
+          }
+
+          const encryptionKeyId = memory.metadata?.encryptionKeyId;
+          console.log(`🔑 Memory encryption key ID: ${encryptionKeyId || 'NOT_SET'}`);
+          
+          if (encryptionKeyId) {
+            // Try to get the key from key management
+            const key = this.keyManagement.getKey(encryptionKeyId);
+            if (key) {
+              console.log(`🔐 Decrypting memory ${memoryId} with managed key ${encryptionKeyId}`);
+              const encryptedData = JSON.parse(memory.content);
+              const decrypted = await this.encryptionService.decrypt(encryptedData, encryptionKeyId, this.keyManagement);
+              memory.content = decrypted.content;
+              console.log(`✅ Memory decrypted successfully for ${memoryId} using managed key`);
+            } else {
+              // Try to regenerate the key from master password using stored salt
+              console.log(`🔄 Regenerating key for memory ${memoryId} from master password`);
+              try {
+                const storedSalt = memory.metadata?.encryptionSalt;
+                const regeneratedKey = await this.keyManagement.generateMemoryKey(memoryId, storedSalt);
+                const encryptedData = JSON.parse(memory.content);
+                const decrypted = await this.encryptionService.decrypt(encryptedData, regeneratedKey.keyId, this.keyManagement);
+                memory.content = decrypted.content;
+                console.log(`✅ Memory decrypted successfully for ${memoryId} using regenerated key with stored salt`);
+              } catch (regenerateError) {
+                console.warn(`⚠️ Failed to regenerate key for memory ${memoryId}:`, regenerateError);
+                // Fallback to old localStorage keys
+                await this.tryFallbackDecryption(memory, memoryId);
+              }
+            }
           } else {
-            console.warn(`No encryption keys available for memory ${memoryId}`);
+            // No key ID stored - try to regenerate from master password
+            console.log(`🔄 No key ID stored, regenerating key for memory ${memoryId}`);
+            try {
+              const storedSalt = memory.metadata?.encryptionSalt;
+              const regeneratedKey = await this.keyManagement.generateMemoryKey(memoryId, storedSalt);
+              const encryptedData = JSON.parse(memory.content);
+              const decrypted = await this.encryptionService.decrypt(encryptedData, regeneratedKey.keyId, this.keyManagement);
+              memory.content = decrypted.content;
+              console.log(`✅ Memory decrypted successfully for ${memoryId} using regenerated key with stored salt`);
+            } catch (regenerateError) {
+              console.warn(`⚠️ Failed to regenerate key for memory ${memoryId}:`, regenerateError);
+              // Fallback to old localStorage keys
+              await this.tryFallbackDecryption(memory, memoryId);
+            }
           }
         } catch (error) {
-          console.error('Failed to decrypt memory:', error);
+          console.error(`❌ Failed to decrypt memory ${memoryId}:`, error);
+          console.log(`📋 Memory content preview: ${memory.content.substring(0, 100)}...`);
           // Return encrypted content if decryption fails
         }
       }
@@ -530,16 +671,54 @@ export class MemoryService {
       for (const memory of allMemories) {
         if (memory.encrypted) {
           try {
-            const keys = this.encryptionService.getKeys();
-            if (keys.length > 0) {
+            const encryptionKeyId = memory.metadata?.encryptionKeyId;
+            let decrypted;
+            
+            if (encryptionKeyId) {
+              console.log(`🔐 Decrypting memory ${memory.id} with specific key ${encryptionKeyId}`);
               const encryptedData = JSON.parse(memory.content);
-              const decrypted = await this.encryptionService.decrypt(encryptedData, keys[0].keyId);
+              decrypted = await this.encryptionService.decrypt(encryptedData, encryptionKeyId, this.keyManagement);
+            } else {
+              // Try to regenerate key with stored salt first
+              console.log(`🔄 No specific key found, trying to regenerate key for memory ${memory.id}`);
+              try {
+                const storedSalt = memory.metadata?.encryptionSalt;
+                const regeneratedKey = await this.keyManagement.generateMemoryKey(memory.id, storedSalt);
+                const encryptedData = JSON.parse(memory.content);
+                decrypted = await this.encryptionService.decrypt(encryptedData, regeneratedKey.keyId, this.keyManagement);
+                console.log(`✅ Memory ${memory.id} decrypted successfully using regenerated key with stored salt`);
+              } catch (regenerateError) {
+                console.log(`⚠️ Failed to regenerate key, trying fallback decryption for memory ${memory.id}`);
+                // Fallback to using available keys (for old memories)
+                const keys = this.encryptionService.getKeys();
               
+                if (keys.length > 0) {
+                  // Try each available key until one works
+                  for (let i = 0; i < keys.length; i++) {
+                    try {
+                      console.log(`🔐 Attempting decryption with key ${i + 1}/${keys.length}: ${keys[i].keyId}`);
+                      const encryptedData = JSON.parse(memory.content);
+                      decrypted = await this.encryptionService.decrypt(encryptedData, keys[i].keyId, this.keyManagement);
+                      console.log(`✅ Memory ${memory.id} decrypted successfully using key ${keys[i].keyId}`);
+                      break;
+                    } catch (keyError: any) {
+                      console.log(`❌ Key ${keys[i].keyId} failed for memory ${memory.id}:`, keyError.message);
+                      continue;
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (decrypted) {
               const decryptedMemory = {
                 ...memory,
                 content: decrypted.content
               };
               decryptedMemories.push(decryptedMemory);
+            } else {
+              console.warn(`No decryption key available for memory ${memory.id}`);
+              decryptedMemories.push(memory); // Add encrypted version if no key available
             }
           } catch (error) {
             console.warn(`Failed to decrypt memory ${memory.id}:`, error);
@@ -687,6 +866,41 @@ export class MemoryService {
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(16);
+  }
+
+  /**
+   * Fallback decryption using old localStorage keys
+   */
+  private async tryFallbackDecryption(memory: MemoryEntry, memoryId: string): Promise<void> {
+    console.log(`🔄 Trying fallback decryption for memory ${memoryId}`);
+    const keys = this.encryptionService.getKeys();
+    console.log(`🔑 Available fallback keys: ${keys.length}`);
+    
+    if (keys.length > 0) {
+      let decryptionSuccessful = false;
+      
+      // Try each available key until one works
+      for (let i = 0; i < keys.length; i++) {
+        try {
+          console.log(`🔐 Attempting fallback decryption with key ${i + 1}/${keys.length}: ${keys[i].keyId}`);
+          const encryptedData = JSON.parse(memory.content);
+          const decrypted = await this.encryptionService.decrypt(encryptedData, keys[i].keyId, this.keyManagement);
+          memory.content = decrypted.content;
+          console.log(`✅ Memory decrypted successfully for ${memoryId} using fallback key ${keys[i].keyId}`);
+          decryptionSuccessful = true;
+          break;
+        } catch (keyError: any) {
+          console.log(`❌ Fallback key ${keys[i].keyId} failed for memory ${memoryId}:`, keyError.message);
+          continue;
+        }
+      }
+      
+      if (!decryptionSuccessful) {
+        console.warn(`⚠️ All ${keys.length} fallback keys failed to decrypt memory ${memoryId}`);
+      }
+    } else {
+      console.warn(`⚠️ No fallback encryption keys available for memory ${memoryId}`);
+    }
   }
 }
 

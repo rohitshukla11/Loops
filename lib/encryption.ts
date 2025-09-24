@@ -44,10 +44,53 @@ export class EncryptionService {
   }
 
   /**
+   * Generate encryption key from user password
+   */
+  generateKeyFromPassword(password: string, salt?: string): EncryptionKey {
+    const keyId = this.generateKeyId();
+    const saltBytes = salt ? CryptoJS.enc.Hex.parse(salt) : CryptoJS.lib.WordArray.random(32);
+    
+    // Derive key from password using PBKDF2
+    const derivedKey = CryptoJS.PBKDF2(password, saltBytes, {
+      keySize: 256 / 32,
+      iterations: this.config.iterations,
+      hasher: CryptoJS.algo.SHA256
+    });
+
+    const encryptionKey: EncryptionKey = {
+      publicKey: derivedKey.toString(CryptoJS.enc.Hex),
+      privateKey: derivedKey.toString(CryptoJS.enc.Hex),
+      keyId: keyId,
+      algorithm: this.config.algorithm,
+      createdAt: new Date(),
+      salt: saltBytes.toString(CryptoJS.enc.Hex),
+    };
+
+    this.keys.set(keyId, encryptionKey);
+    return encryptionKey;
+  }
+
+  /**
    * Encrypt content using AES-256-GCM
    */
-  async encrypt(content: string, keyId?: string): Promise<EncryptedData> {
-    const key = keyId ? this.keys.get(keyId) : this.generateKeyPair();
+  async encrypt(content: string, keyId?: string, keyManagementService?: any): Promise<EncryptedData> {
+    let key: EncryptionKey | undefined;
+    
+    if (keyId && keyManagementService) {
+      // Try to get key from KeyManagementService first
+      key = keyManagementService.getKey(keyId);
+    }
+    
+    if (!key && keyId) {
+      // Fallback to local keys
+      key = this.keys.get(keyId);
+    }
+    
+    if (!key) {
+      // Generate new key if none found
+      key = this.generateKeyPair();
+    }
+    
     if (!key) {
       throw new Error('Encryption key not found');
     }
@@ -83,8 +126,19 @@ export class EncryptionService {
   /**
    * Decrypt content using AES-256-GCM
    */
-  async decrypt(encryptedData: EncryptedData, keyId: string): Promise<DecryptionResult> {
-    const key = this.keys.get(keyId);
+  async decrypt(encryptedData: EncryptedData, keyId: string, keyManagementService?: any): Promise<DecryptionResult> {
+    let key: EncryptionKey | undefined;
+    
+    if (keyManagementService) {
+      // Try to get key from KeyManagementService first
+      key = keyManagementService.getKey(keyId);
+    }
+    
+    if (!key) {
+      // Fallback to local keys
+      key = this.keys.get(keyId);
+    }
+    
     if (!key) {
       throw new Error('Decryption key not found');
     }
@@ -262,7 +316,12 @@ export class EncryptionService {
    * Get all available keys
    */
   getKeys(): EncryptionKey[] {
-    return Array.from(this.keys.values());
+    const keys = Array.from(this.keys.values());
+    console.log('🔐 Available encryption keys:', keys.length, 'keys');
+    keys.forEach(key => {
+      console.log(`🔑 Key ID: ${key.keyId}, Created: ${key.createdAt}`);
+    });
+    return keys;
   }
 
   /**

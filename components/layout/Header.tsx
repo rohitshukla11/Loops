@@ -48,19 +48,19 @@ export function Header({
             <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center shadow-md">
               <Heart className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Personal AI Agent
-              </h1>
-              <p className="text-sm text-purple-700">Understanding you better every day 💜</p>
-            </div>
+                    <div>
+                      <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        BetterHalf.ai
+                      </h1>
+                      <p className="text-sm text-purple-700">Your AI companion for life 💜</p>
+                    </div>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <nav className="flex items-center space-x-6">
               <a href="#" className="text-purple-600 hover:text-purple-800 font-medium transition-colors">
-                Personal Chat
+                Chat
               </a>
               <a href="#" className="text-purple-600 hover:text-purple-800 font-medium transition-colors">
                 Memories
@@ -146,13 +146,13 @@ export function Header({
                 <button
                   onClick={() => {
                     console.log('🖱️ [HEADER] Connect button clicked')
-                    connect('near')
+                    connect('metamask')
                   }}
                   className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-600 border border-transparent rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all shadow-sm disabled:opacity-50"
                   disabled={isLoading}
                 >
                   <Wallet className="w-4 h-4 mr-2" />
-                  {isLoading && currentOperation === 'connect' ? 'Connecting...' : 'Connect NEAR Wallet'}
+                  {isLoading && currentOperation === 'connect' ? 'Connecting...' : 'Connect MetaMask'}
                 </button>
               )}
             </div>
@@ -178,7 +178,7 @@ export function Header({
           <div className="md:hidden border-t border-purple-200 py-4">
             <nav className="flex flex-col space-y-3 mb-4">
               <a href="#" className="text-purple-600 hover:text-purple-800 font-medium transition-colors">
-                Personal Chat
+                Chat
               </a>
               <a href="#" className="text-purple-600 hover:text-purple-800 font-medium transition-colors">
                 Memories
@@ -201,7 +201,7 @@ export function Header({
                   <div className="flex items-center space-x-2 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
                     <Wallet className="w-4 h-4 text-green-600" />
                     <span className="text-sm font-medium text-green-800">
-                      {formatBalance(balance)} NEAR
+                      {formatBalance(balance)} ETH
                     </span>
                   </div>
                   <button
@@ -220,13 +220,13 @@ export function Header({
                 <button
                   onClick={() => {
                     console.log('🖱️ [HEADER] Mobile connect button clicked')
-                    connect('near')
+                    connect('metamask')
                   }}
                   className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-600 border border-transparent rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all shadow-sm disabled:opacity-50"
                   disabled={isLoading}
                 >
                   <Wallet className="w-4 h-4 mr-2" />
-                  {isLoading && currentOperation === 'connect' ? 'Connecting...' : 'Connect NEAR Wallet'}
+                  {isLoading && currentOperation === 'connect' ? 'Connecting...' : 'Connect MetaMask'}
                 </button>
               )}
             </div>

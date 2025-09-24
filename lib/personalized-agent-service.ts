@@ -96,13 +96,23 @@ export class PersonalizedAgentService {
       // Generate response using OpenAI
       const response = await this.callOpenAI(enhancedMessages);
       
-      // Learn from interaction
-      await this.learnFromInteraction(userInput, response);
-
-      return {
-        content: response,
-        shouldStore: true
-      };
+      // Learn from interaction and get Golem DB explorer URL
+      try {
+        const learningResult = await this.learnFromInteraction(userInput, response);
+        return {
+          content: response,
+          shouldStore: true,
+          golemExplorerUrl: learningResult?.golemExplorerUrl
+        };
+      } catch (learningError) {
+        console.error('❌ LEARNING FAILED - Returning response without learning:', learningError);
+        // Return response without learning if learning fails
+        return {
+          content: response,
+          shouldStore: false,
+          golemExplorerUrl: undefined
+        };
+      }
     } catch (error) {
       console.error('Failed to generate personalized response:', error);
       return {
@@ -610,35 +620,85 @@ Current date and time: ${new Date().toLocaleString()}`;
     return data.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
   }
 
-  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<void> {
+  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ golemExplorerUrl?: string } | void> {
     try {
-      // Store interaction patterns and preferences
-      await this.memoryService.createMemory({
-        content: `User preference/pattern: ${userInput} -> ${aiResponse.substring(0, 200)}...`,
+      // Add delay to prevent overwhelming RPC with rapid requests
+      console.log('🧠 Adding delay before learning interaction to prevent RPC overload...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay to prevent nonce conflicts
+      
+      // Store interaction patterns and preferences (limit content size more aggressively)
+      const truncatedInput = userInput.length > 50 ? userInput.substring(0, 50) + '...' : userInput;
+      const truncatedResponse = aiResponse.length > 75 ? aiResponse.substring(0, 75) + '...' : aiResponse;
+      
+      const memoryResult = await this.memoryService.createMemory({
+        content: `User pattern: ${truncatedInput} -> ${truncatedResponse}`,
         type: 'learned_fact',
         category: 'Personal Preferences',
         tags: ['personalized-agent', 'learning', 'preferences'],
         encrypted: true
       });
+
+      // Return Golem DB explorer URL if available
+      if (memoryResult && memoryResult.transactionUrl) {
+        return {
+          golemExplorerUrl: memoryResult.transactionUrl
+        };
+      }
     } catch (error) {
-      console.warn('Failed to store learning interaction:', error);
+      console.error('❌ DETAILED LEARNING INTERACTION ERROR:', error);
+      
+      // Detailed error analysis for learning interaction
+      const errorDetails = {
+        errorType: error.constructor.name,
+        message: error.message,
+        userInput: userInput.substring(0, 100) + '...',
+        aiResponse: aiResponse.substring(0, 100) + '...',
+        timestamp: new Date().toISOString(),
+        memoryServiceStatus: 'FAILED'
+      };
+      
+      console.error('🔍 LEARNING INTERACTION ERROR ANALYSIS:', JSON.stringify(errorDetails, null, 2));
+      
+      // Specific error guidance
+      if (error.message.includes('Memory creation failed')) {
+        console.error('🧠 MEMORY CREATION FAILED IN LEARNING');
+        console.error('   - The memory service failed to create a learning memory');
+        console.error('   - This means the AI cannot learn from this interaction');
+        console.error('   - Check the memory service error details above');
+      }
+      
+      if (error.message.includes('Golem Base')) {
+        console.error('🌐 GOLEM BASE CONNECTIVITY ISSUE');
+        console.error('   - The Golem Base network is unreachable');
+        console.error('   - Learning data cannot be stored on the blockchain');
+        console.error('   - Check network connectivity and RPC endpoint status');
+      }
+      
+      // Don't return fallback URL - let the error propagate
+      throw new Error(`Learning interaction failed: ${error.message}`);
     }
   }
 
   // User profile management
   private async loadUserProfile(): Promise<void> {
     try {
+      // Search specifically for profile_data type memories
       const profileMemories = await this.memoryService.searchMemories({
-        query: 'user profile preferences goals',
+        query: '', // Empty query to get all
+        type: 'profile_data',
         category: 'Personal Profile',
         limit: 10
       });
 
+      console.log(`🔍 Found ${profileMemories.memories.length} existing profile memories`);
+
       if (profileMemories.memories.length > 0) {
-        // Reconstruct profile from memories
+        // Use existing profile - reconstruct from memories
+        console.log('✅ Loading existing user profile from memory');
         this.userProfile = this.reconstructProfileFromMemories(profileMemories.memories);
       } else {
-        // Create default profile
+        // Only create default profile if none exists
+        console.log('📝 No existing profile found, creating default profile');
         this.userProfile = this.getDefaultProfile();
         await this.saveUserProfile();
       }
@@ -652,6 +712,13 @@ Current date and time: ${new Date().toLocaleString()}`;
     if (!this.userProfile) return;
 
     try {
+      // Check if key management is initialized before creating encrypted profile
+      const keyManagement = this.memoryService['keyManagement'];
+      if (!keyManagement.isInitialized()) {
+        console.log('🔐 Key management not initialized - skipping profile creation for now');
+        return;
+      }
+
       await this.memoryService.createMemory({
         content: JSON.stringify(this.userProfile),
         type: 'profile_data',
@@ -665,7 +732,44 @@ Current date and time: ${new Date().toLocaleString()}`;
   }
 
   private reconstructProfileFromMemories(memories: any[]): UserProfile {
-    // Simple reconstruction - in a real app, you'd have more sophisticated logic
+    try {
+      // Get the most recent profile memory
+      const latestProfile = memories
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      
+      if (latestProfile && latestProfile.content) {
+        // Try to parse the stored profile data
+        let profileData;
+        
+        // Check if content is encrypted
+        if (latestProfile.encrypted && typeof latestProfile.content === 'string') {
+          try {
+            const encryptedData = JSON.parse(latestProfile.content);
+            // For now, we'll use default profile for encrypted data
+            // In a real implementation, you'd decrypt it here
+            console.log('⚠️ Profile data is encrypted, using default profile');
+            return this.getDefaultProfile();
+          } catch {
+            // Content might be plain JSON string
+            profileData = JSON.parse(latestProfile.content);
+          }
+        } else {
+          profileData = typeof latestProfile.content === 'string' 
+            ? JSON.parse(latestProfile.content) 
+            : latestProfile.content;
+        }
+        
+        if (profileData && profileData.preferences && profileData.goals) {
+          console.log('✅ Successfully reconstructed profile from stored data');
+          return profileData;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to reconstruct profile from memories:', error);
+    }
+    
+    // Fallback to default profile
+    console.log('📝 Using default profile as fallback');
     return this.getDefaultProfile();
   }
 

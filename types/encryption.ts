@@ -31,6 +31,7 @@ export interface EncryptionKey {
   algorithm: string;
   createdAt: Date;
   expiresAt?: Date;
+  salt?: string; // For password-derived keys
 }
 
 export interface TimelockEncryption {

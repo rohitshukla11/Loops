@@ -4,4 +4,5 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   timestamp: Date;
   memoryId?: string;
+  golemExplorerUrl?: string;
 }

@@ -7,8 +7,8 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Privacy-First AI Memory Platform',
-  description: 'Decentralized AI memory storage with privacy controls',
+  title: 'BetterHalf.ai - Your AI Companion for Life',
+  description: 'Your personalized AI companion that understands your schedule, preferences, and lifestyle to provide tailored recommendations and support.',
 }
 
 export default function RootLayout({

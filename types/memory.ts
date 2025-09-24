@@ -58,6 +58,8 @@ export interface MemoryMetadata {
   version: number;
   parentId?: string;
   relatedMemories: string[];
+  encryptionKeyId?: string; // For storing encryption key ID
+  encryptionSalt?: string; // For storing encryption salt for key regeneration
 }
 
 export interface MemorySearchQuery {

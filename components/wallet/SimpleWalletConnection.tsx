@@ -84,13 +84,13 @@ export default function SimpleWalletConnection() {
           }
         }
         
-        toast.success(`${walletType === 'near' ? 'NEAR' : 'MetaMask'} wallet connected successfully!`);
+        toast.success('MetaMask wallet connected successfully!');
       } else {
-        toast.error(`Failed to connect ${walletType === 'near' ? 'NEAR' : 'MetaMask'} wallet`);
+        toast.error('Failed to connect MetaMask wallet');
       }
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error(`Failed to connect ${walletType === 'near' ? 'NEAR' : 'MetaMask'} wallet`);
+      toast.error('Failed to connect MetaMask wallet');
     } finally {
       setIsConnecting(false);
     }
@@ -109,11 +109,11 @@ export default function SimpleWalletConnection() {
     }
   };
 
-  const formatBalance = (balance: string, walletType: WalletType) => {
+  const formatBalance = (balance: string) => {
     const num = parseFloat(balance);
-    if (num === 0) return `0 ${walletType === 'near' ? 'NEAR' : 'ETH'}`;
-    if (num < 0.001) return `< 0.001 ${walletType === 'near' ? 'NEAR' : 'ETH'}`;
-    return `${num.toFixed(3)} ${walletType === 'near' ? 'NEAR' : 'ETH'}`;
+    if (num === 0) return '0 ETH';
+    if (num < 0.001) return '< 0.001 ETH';
+    return `${num.toFixed(3)} ETH`;
   };
 
   const installMetaMask = () => {
@@ -154,20 +154,6 @@ export default function SimpleWalletConnection() {
             </button>
           ) : (
             <div className="space-y-3">
-              {/* NEAR Wallet Option */}
-              <button
-                onClick={() => handleConnect('near')}
-                disabled={isConnecting}
-                className="w-full flex items-center justify-center px-4 py-3 rounded-md font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                {isConnecting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Wallet className="w-4 h-4 mr-2" />
-                )}
-                Connect NEAR Wallet
-              </button>
-
               {/* MetaMask Option */}
               {isMetaMaskInstalled ? (
                 <button
@@ -212,7 +198,7 @@ export default function SimpleWalletConnection() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">
-                  {account?.walletType === 'near' ? 'NEAR' : 'MetaMask'} Wallet
+                  MetaMask Wallet
                 </p>
                 <p className="text-xs text-gray-500 font-mono">
                   {account?.address?.slice(0, 8)}...{account?.address?.slice(-8)}
@@ -231,7 +217,7 @@ export default function SimpleWalletConnection() {
               <span className="text-sm text-gray-600">Balance</span>
             </div>
             <span className="text-sm font-medium text-gray-900">
-              {formatBalance(balance, account?.walletType || 'near')}
+              {formatBalance(balance)}
             </span>
           </div>
 

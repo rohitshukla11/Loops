@@ -26,6 +26,20 @@ const nextConfig = {
     IPFS_GATEWAY: process.env.IPFS_GATEWAY || 'https://ipfs.io/ipfs/',
     WEB3_STORAGE_TOKEN: process.env.WEB3_STORAGE_TOKEN || '',
   },
+  // BetterHalf.ai configuration
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Application-Name',
+            value: 'BetterHalf.ai',
+          },
+        ],
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig

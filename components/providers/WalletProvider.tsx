@@ -36,14 +36,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         console.log('🔍 [INIT] URL search params:', window.location.search)
         
         // Check localStorage for previous connection
-        const savedAccountId = localStorage.getItem('near_wallet_account_id')
+        const savedAccountId = localStorage.getItem('metamask_wallet_account_id')
         const savedWalletType = localStorage.getItem('wallet_type')
         console.log('💾 [INIT] Saved connection data:', { savedAccountId, savedWalletType })
         
         await unifiedWallet.initialize()
         
-        // Give NEAR wallet extra time to initialize after page refresh
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // MetaMask wallet initializes immediately
         
         // Check if already connected (after redirect or page refresh)
         const walletConnected = unifiedWallet.isWalletConnected()
@@ -67,8 +66,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           
           // Save to localStorage for persistence
           if (currentAccountId) {
-            localStorage.setItem('near_wallet_account_id', currentAccountId)
-            localStorage.setItem('wallet_type', currentWalletType || 'near')
+            localStorage.setItem('metamask_wallet_account_id', currentAccountId)
+            localStorage.setItem('wallet_type', currentWalletType || 'metamask')
             console.log('💾 [INIT] Connection saved to localStorage')
           }
           
@@ -120,19 +119,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     initializeWallet()
     
-    // Check URL parameters for NEAR wallet callback
-    const urlParams = new URLSearchParams(window.location.search)
-    const accountId = urlParams.get('account_id')
-    const publicKey = urlParams.get('public_key')
-    
-    if (accountId || publicKey) {
-      console.log('🔗 [INIT] NEAR wallet callback detected!', { accountId, publicKey })
-      // Delay to ensure wallet is initialized
-      setTimeout(() => {
-        console.log('🔄 [INIT] Re-checking connection after callback...')
-        initializeWallet()
-      }, 1000)
-    }
+    // MetaMask doesn't use URL callbacks
     
     // Additional connection recovery mechanism for page refreshes
     const checkForExistingConnection = () => {
@@ -166,8 +153,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             
             // Save to localStorage for persistence
             if (currentAccountId) {
-              localStorage.setItem('near_wallet_account_id', currentAccountId)
-              localStorage.setItem('wallet_type', currentWalletType || 'near')
+              localStorage.setItem('metamask_wallet_account_id', currentAccountId)
+              localStorage.setItem('wallet_type', currentWalletType || 'metamask')
               console.log('💾 [RECOVERY] Connection saved to localStorage')
             }
             
@@ -197,7 +184,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // Start recovery mechanism
     checkForExistingConnection()
     
-    // Check for connection when page regains focus (after NEAR wallet redirect)
+    // Check for connection when page regains focus
     const handleFocus = () => {
       console.log('👁️ [FOCUS] Page focused, checking for wallet connection...')
       console.log('🔍 [FOCUS] Current state:', { isConnected, isLoading, currentOperation, accountId })
@@ -223,8 +210,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             
             // Save to localStorage for persistence
             if (currentAccountId) {
-              localStorage.setItem('near_wallet_account_id', currentAccountId)
-              localStorage.setItem('wallet_type', currentWalletType || 'near')
+              localStorage.setItem('metamask_wallet_account_id', currentAccountId)
+              localStorage.setItem('wallet_type', currentWalletType || 'metamask')
               console.log('💾 [FOCUS] Connection saved to localStorage')
             }
             
@@ -239,7 +226,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             setCurrentOperation('idle')
             
             // Clear localStorage on disconnection
-            localStorage.removeItem('near_wallet_account_id')
+            localStorage.removeItem('metamask_wallet_account_id')
             localStorage.removeItem('wallet_type')
             console.log('💾 [FOCUS] localStorage cleared on disconnection')
           } else if (walletConnected && isConnected) {
@@ -279,8 +266,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             
             // Save to localStorage for persistence
             if (currentAccountId) {
-              localStorage.setItem('near_wallet_account_id', currentAccountId)
-              localStorage.setItem('wallet_type', currentWalletType || 'near')
+              localStorage.setItem('metamask_wallet_account_id', currentAccountId)
+              localStorage.setItem('wallet_type', currentWalletType || 'metamask')
               console.log('💾 [FOCUS-2] Connection saved to localStorage')
             }
             
@@ -309,7 +296,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [isConnected])
 
-  const connect = async (preferredWalletType: WalletType = 'near'): Promise<boolean> => {
+  const connect = async (preferredWalletType: WalletType = 'metamask'): Promise<boolean> => {
     try {
       console.log('🔌 [CONNECT] Starting wallet connection...')
       console.log('🔍 [CONNECT] Current state:', { isConnected, isLoading, currentOperation, accountId })
@@ -366,8 +353,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             
             // Save to localStorage for persistence
             if (account.address) {
-              localStorage.setItem('near_wallet_account_id', account.address)
-              localStorage.setItem('wallet_type', account.walletType || 'near')
+              localStorage.setItem('metamask_wallet_account_id', account.address)
+              localStorage.setItem('wallet_type', account.walletType || 'metamask')
               console.log('💾 [CONNECT] Connection saved to localStorage')
             }
             
@@ -406,8 +393,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 
                 // Save to localStorage for persistence
                 if (currentAccountId) {
-                  localStorage.setItem('near_wallet_account_id', currentAccountId)
-                  localStorage.setItem('wallet_type', currentWalletType || 'near')
+                  localStorage.setItem('metamask_wallet_account_id', currentAccountId)
+                  localStorage.setItem('wallet_type', currentWalletType || 'metamask')
                   console.log('💾 [CONNECT] Periodic check - Connection saved to localStorage')
                 }
                 
@@ -458,7 +445,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setWalletType(null)
       
       // Clear localStorage
-      localStorage.removeItem('near_wallet_account_id')
+      localStorage.removeItem('metamask_wallet_account_id')
       localStorage.removeItem('wallet_type')
       console.log('💾 [DISCONNECT] localStorage cleared')
       console.log('🔄 [DISCONNECT] UI state reset completed')
@@ -512,7 +499,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         
         // Save to localStorage for persistence
         if (currentAccountId) {
-          localStorage.setItem('near_wallet_account_id', currentAccountId)
+          localStorage.setItem('metamask_wallet_account_id', currentAccountId)
           localStorage.setItem('wallet_type', currentWalletType || 'near')
           console.log('💾 [CHECK] Connection saved to localStorage')
         }
@@ -529,7 +516,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setCurrentOperation('idle')
         
         // Clear localStorage on disconnection
-        localStorage.removeItem('near_wallet_account_id')
+        localStorage.removeItem('metamask_wallet_account_id')
         localStorage.removeItem('wallet_type')
         console.log('💾 [CHECK] localStorage cleared on disconnection')
       } else {

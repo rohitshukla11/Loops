@@ -1,17 +1,18 @@
-# Privacy-First AI Assistant
+# BetterHalf.ai
 
-A decentralized AI chatbot that enables secure conversations with privacy-first memory storage using Golem Base, NEAR Protocol, and advanced encryption.
+Your AI companion for life - a personalized AI assistant that understands your schedule, preferences, and lifestyle to provide tailored recommendations and support. Built with privacy-first design using Golem Base, NEAR Protocol, and advanced encryption.
 
 ## 🏗️ Architecture
 
 ### Core Components
 
-1. **Chat Interface**: Real-time AI conversation with privacy-first design
-2. **Memory Storage**: Golem Base for decentralized conversation storage
-3. **Blockchain Anchoring**: NEAR Protocol smart contracts for metadata and access control
-4. **Encryption**: Randamu dcipher for threshold encryption and timelock policies
-5. **UI**: React/Next.js web application with NEAR wallet integration
-6. **Optional**: OpenServ AI marketplace and NEAR Private ML SDK integration
+1. **Personalized Chat Interface**: AI conversation tailored to your lifestyle and preferences
+2. **Calendar Integration**: Google Calendar analysis for schedule optimization and insights
+3. **Memory Storage**: Golem Base for decentralized conversation and learning storage
+4. **Blockchain Anchoring**: NEAR Protocol smart contracts for metadata and access control
+5. **Encryption**: Randamu dcipher for threshold encryption and timelock policies
+6. **UI**: React/Next.js web application with NEAR wallet integration
+7. **Lifestyle Recommendations**: Personalized suggestions for meals, workouts, and daily optimization
 
 ### Technology Stack
 
@@ -28,14 +29,14 @@ A decentralized AI chatbot that enables secure conversations with privacy-first 
 - Node.js 18+ 
 - npm or yarn
 - NEAR testnet account
-- Ethereum private key for Golem Base (get testnet funds from [Kaolin Faucet](https://kaolin.holesky.golemdb.io/faucet/))
+- Ethereum private key for Golem Base (get testnet funds from [ETH Warsaw Faucet](https://ethwarsaw.holesky.golemdb.io/faucet/))
 
 ### Installation
 
 1. **Clone and install dependencies**:
 ```bash
 git clone <repository-url>
-cd privacy-first-ai-memory
+cd betterhalf-ai
 npm install
 ```
 
@@ -50,9 +51,9 @@ NEXT_PUBLIC_NEAR_NETWORK=testnet
 NEXT_PUBLIC_CONTRACT_ID=your-contract-id.testnet
 NEXT_PUBLIC_WEB3_STORAGE_TOKEN=your_web3_storage_token
 NEXT_PUBLIC_GOLEM_PRIVATE_KEY=your_ethereum_private_key
-NEXT_PUBLIC_GOLEM_CHAIN_ID=60138453025
-NEXT_PUBLIC_GOLEM_RPC_URL=https://kaolin.holesky.golemdb.io/rpc
-NEXT_PUBLIC_GOLEM_WS_URL=wss://kaolin.holesky.golemdb.io/rpc/ws
+NEXT_PUBLIC_GOLEM_CHAIN_ID=60138453033
+NEXT_PUBLIC_GOLEM_RPC_URL=https://ethwarsaw.holesky.golemdb.io/rpc
+NEXT_PUBLIC_GOLEM_WS_URL=wss://ethwarsaw.holesky.golemdb.io/rpc/ws
 ```
 
 3. **Deploy smart contracts**:
@@ -197,9 +198,9 @@ revoke_permission(memoryId: string, agentId: string): void
 
 ### Golem Base
 
-- **Chain ID**: `60138453025` (Kaolin testnet)
-- **RPC URL**: `https://kaolin.holesky.golemdb.io/rpc`
-- **WebSocket URL**: `wss://kaolin.holesky.golemdb.io/rpc/ws`
+- **Chain ID**: `60138453033` (ETH Warsaw testnet)
+- **RPC URL**: `https://ethwarsaw.holesky.golemdb.io/rpc`
+- **WebSocket URL**: `wss://ethwarsaw.holesky.golemdb.io/rpc/ws`
 - **Web3.Storage**: Optional backup storage
 
 ### Encryption
@@ -284,8 +285,8 @@ NEAR_ENV=mainnet npm run contract:deploy
 ### Golem Base Setup
 
 ```bash
-# Get testnet funds from Kaolin Faucet
-# Visit: https://kaolin.holesky.golemdb.io/faucet/
+# Get testnet funds from ETH Warsaw Faucet
+# Visit: https://ethwarsaw.holesky.golemdb.io/faucet/
 # Enter your Ethereum address to receive testnet ETH
 
 # Test Golem Base integration

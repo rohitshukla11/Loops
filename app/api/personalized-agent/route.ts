@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       content: response.content,
       shouldStore: response.shouldStore,
-      insights
+      insights,
+      golemExplorerUrl: response.golemExplorerUrl
     });
 
   } catch (error: any) {
