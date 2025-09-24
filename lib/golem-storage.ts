@@ -454,7 +454,7 @@ export class GolemStorageService {
         console.log(`🔗 Final Transaction URL: ${txUrl}`);
         console.log(`✅ Official SDK transaction hash captured successfully!`);
         console.log(`📋 Transaction Hash: ${transactionHash}`);
-        console.log(`🔍 View in account history: ${explorerUrl}/address/${this.config.ownerAddress}?tab=txs`);
+        console.log(`🔍 View in account history: ${explorerUrl}/address/${process.env.NEXT_PUBLIC_GOLEM_ADDRESS}?tab=txs`);
       } else {
         console.warn(`⚠️ Transaction hash was not captured via txHashCallback`);
       }

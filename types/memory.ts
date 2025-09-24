@@ -20,7 +20,8 @@ export type MemoryType =
   | 'task_outcome'
   | 'multimedia'
   | 'workflow'
-  | 'agent_share';
+  | 'agent_share'
+  | 'profile_data';
 
 export interface AccessPolicy {
   owner: string; // NEAR account ID

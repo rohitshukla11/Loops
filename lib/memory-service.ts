@@ -529,7 +529,8 @@ export class MemoryService {
             task_outcome: 0,
             multimedia: 0,
             workflow: 0,
-            agent_share: 0
+            agent_share: 0,
+            profile_data: 0
           },
           categories: {},
           tags: {}
@@ -548,7 +549,8 @@ export class MemoryService {
             task_outcome: 0,
             multimedia: 0,
             workflow: 0,
-            agent_share: 0
+            agent_share: 0,
+            profile_data: 0
           },
           categories: {}, 
           tags: {} 

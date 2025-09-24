@@ -3,6 +3,7 @@ import { ChatMessage } from '@/types/chat';
 export interface AIResponse {
   content: string;
   shouldStore: boolean;
+  golemExplorerUrl?: string;
 }
 
 export interface AIService {

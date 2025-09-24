@@ -38,7 +38,7 @@ export class MetaMaskWalletService {
         throw new Error('MetaMask is not installed');
       }
 
-      const accounts = await window.ethereum.request({
+      const accounts = await window.ethereum!.request({
         method: 'eth_requestAccounts',
       });
 
@@ -83,7 +83,7 @@ export class MetaMaskWalletService {
       const accountAddress = address || this.account?.address;
       if (!accountAddress) return '0';
 
-      const balance = await window.ethereum.request({
+      const balance = await window.ethereum!.request({
         method: 'eth_getBalance',
         params: [accountAddress, 'latest'],
       });
@@ -100,7 +100,7 @@ export class MetaMaskWalletService {
   async switchToEthereumMainnet(): Promise<boolean> {
     try {
       // Switch to Ethereum mainnet
-      await window.ethereum.request({
+      await window.ethereum!.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: '0x1' }], // Ethereum mainnet chain ID
       });
@@ -115,7 +115,7 @@ export class MetaMaskWalletService {
   async switchToEthereumSepolia(): Promise<boolean> {
     try {
       // Switch to Ethereum Sepolia testnet
-      await window.ethereum.request({
+      await window.ethereum!.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: '0xaa36a7' }], // Ethereum Sepolia testnet chain ID
       });
@@ -131,7 +131,7 @@ export class MetaMaskWalletService {
     try {
       if (!this.account?.address) return null;
 
-      const signature = await window.ethereum.request({
+      const signature = await window.ethereum!.request({
         method: 'personal_sign',
         params: [message, this.account.address],
       });

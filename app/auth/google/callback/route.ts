@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
       // Redirect back to the app with success and tokens
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?calendar_auth=success&tokens=${encodedTokens}`);
-    } catch (fetchError) {
+    } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
         console.error('Token exchange timed out');

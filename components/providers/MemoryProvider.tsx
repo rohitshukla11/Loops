@@ -36,7 +36,7 @@ export function MemoryProvider({ children }: { children: ReactNode }) {
   const refreshMemories = async (): Promise<void> => {
     try {
       setIsLoading(true)
-      const userMemories = await memoryService.getUserMemories()
+      const userMemories = await memoryService.getAllMemories()
       setMemories(userMemories)
     } catch (error) {
       console.error('Failed to refresh memories:', error)
@@ -53,14 +53,13 @@ export function MemoryProvider({ children }: { children: ReactNode }) {
     encrypt?: boolean
   }): Promise<MemoryEntry | null> => {
     try {
-      const memory = await memoryService.createMemory(
-        data.content,
-        data.type,
-        data.category,
-        data.tags,
-        undefined,
-        data.encrypt ?? true
-      )
+      const memory = await memoryService.createMemory({
+        content: data.content,
+        type: data.type,
+        category: data.category,
+        tags: data.tags,
+        encrypted: data.encrypt ?? true
+      })
       
       if (memory) {
         setMemories(prev => [memory, ...prev])

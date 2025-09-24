@@ -167,7 +167,7 @@ export class ChatService {
       // If no tracked entity key or it failed, search for chat history in owned memories
       try {
         console.log('🔍 Searching for chat history in owned memories...');
-        const allEntityKeys = await golemStorage.getOwnedEntityKeys();
+        const allEntityKeys = await golemStorage.getAllEntityKeys();
         
         for (const entityKey of allEntityKeys) {
           try {
