@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Header } from '@/components/layout/Header'
-import { ChatInterface } from '@/components/chat/ChatInterface'
+import { PersonalizedChatInterface } from '@/components/chat/PersonalizedChatInterface'
+import { ProfileManagement, UserProfile } from '@/components/profile/ProfileManagement'
 import { MemoryManagement } from '@/components/memory/MemoryManagement'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import CalendarInterface from '@/components/calendar/CalendarInterface'
@@ -12,6 +13,7 @@ import { aiService } from '@/lib/ai-service'
 import { MemoryType, MemoryEntry } from '@/types/memory'
 import { ChatMessage } from '@/types/chat'
 import toast from 'react-hot-toast'
+import { Heart, Settings, User } from 'lucide-react'
 
 export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -27,6 +29,13 @@ export default function Home() {
   })
   const [lastTransactionUrl, setLastTransactionUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'memories' | 'calendar'>('memories')
+  
+  // Personal AI is now the default and only mode
+  const [personalizedMessages, setPersonalizedMessages] = useState<ChatMessage[]>([])
+  const [showProfileManagement, setShowProfileManagement] = useState(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [personalizedInsights, setPersonalizedInsights] = useState<any>(null)
+  const [showInsights, setShowInsights] = useState(true) // Show insights by default
 
   const memoryService = getMemoryService()
   const chatService = getChatService()
@@ -146,8 +155,11 @@ export default function Home() {
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return
 
-    // Note: No authentication required - using Ethereum wallet for Golem Base
+    await handlePersonalizedMessage(content)
+  }
 
+
+  const handlePersonalizedMessage = async (content: string) => {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       content: content.trim(),
@@ -155,70 +167,73 @@ export default function Home() {
       timestamp: new Date()
     }
 
-    setMessages(prev => [...prev, userMessage])
+    setPersonalizedMessages(prev => [...prev, userMessage])
     setIsLoading(true)
     setIsTyping(true)
 
     try {
-      // Generate AI response using the AI service
-      const aiResponse = await aiService.generateResponse(content, messages)
+      // Call personalized agent API
+      const response = await fetch('/api/personalized-agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userInput: content,
+          previousMessages: personalizedMessages
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get personalized response');
+      }
+
+      const data = await response.json();
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: aiResponse.content,
+        content: data.content,
         role: 'assistant',
         timestamp: new Date()
       }
 
-      const updatedMessages = [...messages, userMessage, assistantMessage]
-      setMessages(updatedMessages)
+      const updatedMessages = [...personalizedMessages, userMessage, assistantMessage]
+      setPersonalizedMessages(updatedMessages)
 
-      // Save chat history to persistent storage (Golem Base only)
-      await saveChatHistory(updatedMessages)
-      
-      // Show transaction URL for chat save
-      const chatEntityKey = chatService.getChatEntityKey()
-      if (chatEntityKey) {
-        const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
-        const txUrl = `${explorerUrl}/entity/${chatEntityKey}`
-        setLastTransactionUrl(txUrl)
+      // Update insights if provided
+      if (data.insights) {
+        setPersonalizedInsights(data.insights)
       }
 
-      // Store conversation in memory (Golem Base only)
-      if (storeMemory && aiResponse.shouldStore) {
-        console.log('🧠 Storing conversation in encrypted memory...')
-        const memory = await memoryService.createMemory({
-          content: `User: ${content}\nAssistant: ${aiResponse.content}`,
-          type: 'conversation',
-          category: 'Chat',
-          tags: ['conversation', 'ai-chat'],
-          encrypted: true
-        })
-        console.log('✅ Conversation stored with ID:', memory.id)
-        console.log('🗃️ Golem Base Entity Key:', memory.ipfsHash)
-        const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
-        const txUrl = `${explorerUrl}/entity/${memory.ipfsHash}`
-        console.log(`🔗 Transaction URL: ${txUrl}`)
-        setLastTransactionUrl(txUrl)
-        
-        loadStats()
-        loadMemories()
+      // Store conversation in memory if enabled
+      if (storeMemory && data.shouldStore) {
+        try {
+          const memory = await memoryService.createMemory({
+            content: `User: ${content}\nPersonal AI: ${data.content}`,
+            type: 'conversation',
+            category: 'Personal Chat',
+            tags: ['personalized-agent', 'conversation', 'lifestyle'],
+            encrypted: true
+          })
+          console.log('✅ Personalized conversation stored with ID:', memory.id)
+          
+          loadStats()
+          loadMemories()
+        } catch (memoryError) {
+          console.warn('Failed to store personalized conversation:', memoryError)
+        }
       }
 
     } catch (error: any) {
-      console.error('Failed to send message:', error)
+      console.error('Failed to send personalized message:', error)
       
-      // Show specific error messages based on the error type
-      if (error.message.includes('API key is required')) {
-        toast.error('OpenAI API key is not configured. Please check your environment variables.')
-      } else if (error.message.includes('401')) {
-        toast.error('Invalid OpenAI API key. Please check your credentials.')
+      if (error.message.includes('API key')) {
+        toast.error('OpenAI API key is not configured properly. Please check your environment variables.')
       } else if (error.message.includes('429')) {
         toast.error('Rate limit exceeded. Please try again in a moment.')
-      } else if (error.message.includes('network')) {
-        toast.error('Network error. Please check your internet connection.')
       } else {
-        toast.error('Failed to send message. Please try again.')
+        toast.error(error.message || 'Failed to get personalized response. Please try again.')
       }
     } finally {
       setIsLoading(false)
@@ -229,15 +244,76 @@ export default function Home() {
 
   const clearChat = async () => {
     try {
-      console.log('🗑️ Clearing chat...')
-      await chatService.clearChatHistory()
-      const messages = await chatService.loadChatMessages()
-      setMessages(messages)
-      console.log('✅ Chat cleared successfully')
+      console.log('🗑️ Clearing Personal AI chat...')
+      setPersonalizedMessages([])
+      setPersonalizedInsights(null)
+      console.log('✅ Personal AI chat cleared successfully')
     } catch (error) {
       console.error('Failed to clear chat:', error)
     }
   }
+
+  // Profile Management Functions
+  const loadUserProfile = async () => {
+    try {
+      const response = await fetch('/api/profile')
+      if (response.ok) {
+        const data = await response.json()
+        setUserProfile(data.profile)
+      }
+    } catch (error) {
+      console.error('Failed to load user profile:', error)
+    }
+  }
+
+  const handleUpdateProfile = async (profile: UserProfile) => {
+    try {
+      const response = await fetch('/api/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile,
+          updateType: 'full'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json()
+        setUserProfile(data.profile)
+        toast.success('Profile updated successfully!')
+        
+        // Refresh insights
+        await refreshPersonalizedInsights()
+      } else {
+        throw new Error('Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error)
+      toast.error('Failed to update profile')
+    }
+  }
+
+  const refreshPersonalizedInsights = async () => {
+    try {
+      const response = await fetch('/api/personalized-agent')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.insights) {
+          setPersonalizedInsights(data.insights)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to refresh insights:', error)
+    }
+  }
+
+  // Load profile and insights on mount (Personal AI is always active)
+  useEffect(() => {
+    loadUserProfile()
+    refreshPersonalizedInsights()
+  }, [])
 
 
   const handleSearchMemories = async (query: string) => {
@@ -305,7 +381,20 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-      <Header />
+      <Header 
+        showInsights={showInsights}
+        onToggleInsights={(show) => {
+          setShowInsights(show)
+          if (show && !personalizedInsights) {
+            refreshPersonalizedInsights()
+          }
+        }}
+        onShowProfile={() => setShowProfileManagement(true)}
+        storeMemory={storeMemory}
+        onToggleMemory={setStoreMemory}
+        onClearChat={clearChat}
+        insights={personalizedInsights}
+      />
       
       {/* Transaction URL Display */}
       {lastTransactionUrl && (
@@ -333,16 +422,18 @@ export default function Home() {
       )}
       
       <main className="flex-1 flex flex-col xl:flex-row w-full overflow-hidden">
-        {/* Chat Interface - 60% Width */}
+        {/* Personal AI Chat Interface - 60% Width */}
         <div className="w-full xl:w-3/5 flex flex-col min-w-0 bg-white border-r border-gray-200 overflow-hidden">
-          <ChatInterface
-            messages={messages}
+          <PersonalizedChatInterface
+            messages={personalizedMessages}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
             isTyping={isTyping}
             onClearChat={clearChat}
             storeMemory={storeMemory}
             onToggleMemory={setStoreMemory}
+            insights={showInsights ? personalizedInsights : null}
+            onShowProfile={() => setShowProfileManagement(true)}
           />
         </div>
 
@@ -374,6 +465,19 @@ export default function Home() {
           />
         </div>
       </main>
+
+      {/* Profile Management Modal */}
+      {showProfileManagement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <ProfileManagement
+              profile={userProfile}
+              onUpdateProfile={handleUpdateProfile}
+              onClose={() => setShowProfileManagement(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

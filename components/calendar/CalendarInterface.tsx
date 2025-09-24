@@ -206,20 +206,20 @@ export default function CalendarInterface({
     return (
       <div className="h-full flex flex-col bg-white">
         {/* Google Calendar-style Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between p-4 border-b border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-md">
               <Calendar className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl font-normal text-gray-900">Calendar</h1>
+            <h1 className="text-xl font-normal text-purple-800">Calendar</h1>
           </div>
         </div>
 
         {/* Connect Calendar */}
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-sm">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Calendar className="w-8 h-8 text-gray-400" />
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-purple-500" />
             </div>
             <h3 className="text-lg font-normal text-gray-900 mb-2">
               Connect your calendar
@@ -229,7 +229,7 @@ export default function CalendarInterface({
             </p>
             <button
               onClick={handleAuth}
-              className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
+              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-md hover:from-purple-600 hover:to-pink-700 transition-all text-sm font-medium shadow-md"
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -248,17 +248,17 @@ export default function CalendarInterface({
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Google Calendar-style Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+      <div className="flex items-center justify-between p-4 border-b border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-md">
             <Calendar className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-xl font-normal text-gray-900">Calendar</h1>
+          <h1 className="text-xl font-normal text-purple-800">Calendar</h1>
         </div>
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-md hover:from-purple-600 hover:to-pink-700 transition-all text-sm font-medium shadow-md"
           >
             <Plus className="w-4 h-4" />
             <span>Create</span>
@@ -277,7 +277,7 @@ export default function CalendarInterface({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search events..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </form>
           </div>
@@ -309,7 +309,7 @@ export default function CalendarInterface({
           </div>
           <button
             onClick={() => navigateDate('today')}
-            className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+            className="px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded"
           >
             Today
           </button>
@@ -320,7 +320,7 @@ export default function CalendarInterface({
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
           </div>
         ) : events.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-gray-500">
@@ -401,7 +401,7 @@ export default function CalendarInterface({
                   value={newEvent.summary}
                   onChange={(e) => setNewEvent({...newEvent, summary: e.target.value})}
                   placeholder="Add title"
-                  className="w-full text-xl font-normal placeholder-gray-400 border-0 border-b border-gray-200 focus:border-blue-500 focus:outline-none pb-2"
+                  className="w-full text-xl font-normal placeholder-gray-400 border-0 border-b border-gray-200 focus:border-purple-500 focus:outline-none pb-2"
                 />
               </div>
               
@@ -415,7 +415,7 @@ export default function CalendarInterface({
                       ...newEvent,
                       start: { ...newEvent.start, dateTime: e.target.value + ':00.000Z' }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -427,7 +427,7 @@ export default function CalendarInterface({
                       ...newEvent,
                       end: { ...newEvent.end, dateTime: e.target.value + ':00.000Z' }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -438,7 +438,7 @@ export default function CalendarInterface({
                   value={newEvent.location}
                   onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
                   placeholder="Add location"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
               
@@ -448,7 +448,7 @@ export default function CalendarInterface({
                   onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
                   placeholder="Add description"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                 />
               </div>
             </div>
@@ -463,7 +463,7 @@ export default function CalendarInterface({
               <button
                 onClick={handleCreateEvent}
                 disabled={!newEvent.summary || !newEvent.start?.dateTime || !newEvent.end?.dateTime}
-                className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white text-sm font-medium rounded-md hover:from-purple-600 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
               >
                 Save
               </button>
