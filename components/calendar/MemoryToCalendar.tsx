@@ -39,7 +39,6 @@ export default function MemoryToCalendar({
       
       const event = await calendarService.createEvent({
         summary: eventDetails.title,
-        description: `Memory: ${memory.content}`,
         start: {
           dateTime: eventDetails.startTime,
           timeZone: 'UTC'
@@ -49,7 +48,11 @@ export default function MemoryToCalendar({
           timeZone: 'UTC'
         },
         location: eventDetails.location,
-        attendees: eventDetails.attendees?.map(email => ({ email })) || []
+        attendees: eventDetails.attendees.map(email => ({
+          email: email,
+          displayName: email.split('@')[0]
+        })),
+        description: `Created from memory: ${memory.content.substring(0, 200)}...`
       });
 
       console.log('✅ Event created from memory:', event.id);

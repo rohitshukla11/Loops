@@ -194,7 +194,7 @@ export class PersonalizedAgentService {
     const workEnd = 17; // 5 PM
     
     if (events.length === 0) {
-      freeTimes.push(`${workStart}:00 AM - ${workEnd > 12 ? workEnd - 12 : workEnd}:00 ${workEnd >= 12 ? 'PM' : 'AM'}`);
+      freeTimes.push(`${workStart}:00 AM - ${workEnd > 12 ? workEnd - 12 : workEnd}:00 ${workEnd > 12 ? 'PM' : 'AM'}`);
       return freeTimes;
     }
 
@@ -644,13 +644,13 @@ Current date and time: ${new Date().toLocaleString()}`;
           golemExplorerUrl: memoryResult.transactionUrl
         };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ DETAILED LEARNING INTERACTION ERROR:', error);
       
       // Detailed error analysis for learning interaction
       const errorDetails = {
-        errorType: (error as Error).constructor.name,
-        message: (error as Error).message,
+        errorType: error.constructor.name,
+        message: error.message,
         userInput: userInput.substring(0, 100) + '...',
         aiResponse: aiResponse.substring(0, 100) + '...',
         timestamp: new Date().toISOString(),
@@ -660,14 +660,14 @@ Current date and time: ${new Date().toLocaleString()}`;
       console.error('🔍 LEARNING INTERACTION ERROR ANALYSIS:', JSON.stringify(errorDetails, null, 2));
       
       // Specific error guidance
-      if ((error as Error).message.includes('Memory creation failed')) {
+      if (error.message.includes('Memory creation failed')) {
         console.error('🧠 MEMORY CREATION FAILED IN LEARNING');
         console.error('   - The memory service failed to create a learning memory');
         console.error('   - This means the AI cannot learn from this interaction');
         console.error('   - Check the memory service error details above');
       }
       
-      if ((error as Error).message.includes('Golem Base')) {
+      if (error.message.includes('Golem Base')) {
         console.error('🌐 GOLEM BASE CONNECTIVITY ISSUE');
         console.error('   - The Golem Base network is unreachable');
         console.error('   - Learning data cannot be stored on the blockchain');
@@ -675,7 +675,7 @@ Current date and time: ${new Date().toLocaleString()}`;
       }
       
       // Don't return fallback URL - let the error propagate
-      throw new Error(`Learning interaction failed: ${(error as Error).message}`);
+      throw new Error(`Learning interaction failed: ${error.message}`);
     }
   }
 
