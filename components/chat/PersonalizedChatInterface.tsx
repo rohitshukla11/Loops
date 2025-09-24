@@ -136,44 +136,44 @@ export function PersonalizedChatInterface({
 
       {/* Compact Daily Analysis */}
       {showInsights && insights && (
-        <div className="border-b border-purple-200 bg-gradient-to-r from-purple-50/50 to-pink-50/50 px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium text-purple-800">📊 Today's Insights</h4>
+        <div className="border-b border-purple-200 bg-gradient-to-r from-purple-50/50 to-pink-50/50 px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-xs font-medium text-purple-800">📊 Today's Insights</h4>
             <div className="text-xs text-purple-600">
-              Balance: <span className={`font-bold ${getBalanceScoreColor(insights.wellness.balanceScore)}`}>{insights.wellness.balanceScore}/10</span>
+              Balance: <span className={`font-semibold ${getBalanceScoreColor(insights.wellness.balanceScore)}`}>{insights.wellness.balanceScore}/10</span>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
             {/* Schedule Summary */}
-            <div className="bg-white/60 rounded-md px-3 py-2">
-              <div className="flex items-center space-x-1 mb-1">
-                <Calendar className="w-3 h-3 text-purple-600" />
-                <span className="font-medium text-slate-700">Schedule</span>
+            <div className="bg-white/60 rounded px-2 py-1">
+              <div className="flex items-center space-x-1 mb-0.5">
+                <Calendar className="w-2.5 h-2.5 text-purple-600" />
+                <span className="font-medium text-slate-700 text-xs">Schedule</span>
               </div>
-              <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getWorkloadColor(insights.scheduleAnalysis.workloadLevel)}`}>
+              <div className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${getWorkloadColor(insights.scheduleAnalysis.workloadLevel)}`}>
                 {insights.scheduleAnalysis.workloadLevel}
               </div>
             </div>
 
             {/* Top Priority */}
-            <div className="bg-white/60 rounded-md px-3 py-2">
-              <div className="flex items-center space-x-1 mb-1">
-                <Target className="w-3 h-3 text-blue-600" />
-                <span className="font-medium text-slate-700">Focus</span>
+            <div className="bg-white/60 rounded px-2 py-1">
+              <div className="flex items-center space-x-1 mb-0.5">
+                <Target className="w-2.5 h-2.5 text-blue-600" />
+                <span className="font-medium text-slate-700 text-xs">Focus</span>
               </div>
-              <p className="text-slate-600 truncate">
+              <p className="text-slate-600 truncate text-xs">
                 {insights.recommendations.priorities[0] || "Stay productive 🎯"}
               </p>
             </div>
 
             {/* Quick Suggestion */}
-            <div className="bg-white/60 rounded-md px-3 py-2">
-              <div className="flex items-center space-x-1 mb-1">
-                <Heart className="w-3 h-3 text-pink-600" />
-                <span className="font-medium text-slate-700">Wellness</span>
+            <div className="bg-white/60 rounded px-2 py-1">
+              <div className="flex items-center space-x-1 mb-0.5">
+                <Heart className="w-2.5 h-2.5 text-pink-600" />
+                <span className="font-medium text-slate-700 text-xs">Wellness</span>
               </div>
-              <p className="text-slate-600 truncate">
+              <p className="text-slate-600 truncate text-xs">
                 {insights.recommendations.meals[0] || insights.recommendations.workoutTimes[0] || "Take care of yourself 💜"}
               </p>
             </div>

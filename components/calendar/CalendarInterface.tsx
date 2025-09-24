@@ -247,69 +247,65 @@ export default function CalendarInterface({
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Google Calendar-style Header */}
-      <div className="flex items-center justify-between p-4 border-b border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-md">
-            <Calendar className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-xl font-normal text-purple-800">Calendar</h1>
-        </div>
+      {/* Compact Calendar Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-md hover:from-purple-600 hover:to-pink-700 transition-all text-sm font-medium shadow-md"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create</span>
-          </button>
+          <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+            <Calendar className="w-4 h-4 text-white" />
+          </div>
+          <h1 className="text-base font-medium text-purple-800">Calendar</h1>
         </div>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded text-sm font-medium hover:from-purple-600 hover:to-pink-700 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create</span>
+        </button>
       </div>
 
-      {/* Google Calendar-style Search and Navigation */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-center space-x-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <form onSubmit={handleSearch} className="w-full">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search events..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </form>
-          </div>
+      {/* Compact Search and Navigation */}
+      <div className="px-3 py-2 border-b border-gray-100 space-y-2">
+        {/* Compact Search */}
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <form onSubmit={handleSearch} className="w-full">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search events..."
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-transparent"
+            />
+          </form>
         </div>
         
-        {/* Date Navigation */}
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex items-center space-x-2">
+        {/* Compact Date Navigation */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1">
             <button
               onClick={() => navigateDate('prev')}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-0.5 hover:bg-gray-100 rounded"
             >
-              <ChevronLeft className="w-5 h-5 text-gray-600" />
+              <ChevronLeft className="w-4 h-4 text-gray-600" />
             </button>
-            <h2 className="text-lg font-medium text-gray-900 min-w-0">
+            <h2 className="text-sm font-medium text-gray-900 min-w-0 px-1">
               {selectedDate.toLocaleDateString('en-US', { 
-                weekday: 'long',
-                year: 'numeric', 
-                month: 'long', 
+                weekday: 'short',
+                month: 'short', 
                 day: 'numeric' 
               })}
             </h2>
             <button
               onClick={() => navigateDate('next')}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-0.5 hover:bg-gray-100 rounded"
             >
-              <ChevronRight className="w-5 h-5 text-gray-600" />
+              <ChevronRight className="w-4 h-4 text-gray-600" />
             </button>
           </div>
           <button
             onClick={() => navigateDate('today')}
-            className="px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded"
+            className="px-2 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded"
           >
             Today
           </button>
