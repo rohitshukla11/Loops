@@ -43,13 +43,31 @@ export class UnifiedWalletService {
   }
 
   async disconnectWallet(): Promise<void> {
-    if (this.currentWalletType === 'near') {
-      await this.nearWallet.disconnectWallet();
-    } else if (this.currentWalletType === 'metamask') {
-      await this.metaMaskWallet.disconnect();
+    console.log('🔌 UnifiedWallet disconnect started')
+    console.log('💼 Current wallet type:', this.currentWalletType)
+    
+    const walletType = this.currentWalletType
+    
+    // Reset state immediately
+    this.currentWalletType = null
+    console.log('🔄 UnifiedWallet state reset immediately')
+    
+    // Trigger wallet-specific disconnect in background (non-blocking)
+    if (walletType === 'near') {
+      console.log('📱 Triggering NEAR wallet disconnect...')
+      this.nearWallet.disconnectWallet().catch(error => {
+        console.warn('⚠️ NEAR wallet background disconnect error:', error)
+      })
+    } else if (walletType === 'metamask') {
+      console.log('🦊 Triggering MetaMask wallet disconnect...')
+      this.metaMaskWallet.disconnect().catch(error => {
+        console.warn('⚠️ MetaMask wallet background disconnect error:', error)
+      })
+    } else {
+      console.log('ℹ️  No wallet type was set')
     }
     
-    this.currentWalletType = null;
+    console.log('✅ UnifiedWallet disconnect completed (non-blocking)')
   }
 
   isWalletConnected(): boolean {

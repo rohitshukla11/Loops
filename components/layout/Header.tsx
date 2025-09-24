@@ -24,7 +24,7 @@ export function Header({
   onClearChat,
   insights
 }: HeaderProps = {}) {
-  const { isConnected, accountId, balance, connect, disconnect, isLoading } = useWallet()
+  const { isConnected, accountId, balance, connect, disconnect, isLoading, currentOperation } = useWallet()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const formatBalance = (balance: string) => {
@@ -118,35 +118,41 @@ export function Header({
             <div className="flex items-center space-x-3">
               {isConnected ? (
                 <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-2 bg-slate-50 rounded-lg px-3 py-2">
-                    <User className="w-4 h-4 text-slate-600" />
-                    <span className="text-sm font-medium text-slate-900">
+                  <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg px-2 py-1.5 border border-purple-200">
+                    <User className="w-3 h-3 text-purple-600" />
+                    <span className="text-xs font-medium text-purple-800 max-w-24 truncate">
                       {formatAccountId(accountId)}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2 bg-green-50 rounded-lg px-3 py-2">
-                    <Wallet className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-900">
-                      {formatBalance(balance)} NEAR
+                  <div className="flex items-center space-x-1 bg-green-50 rounded-lg px-2 py-1.5 border border-green-200">
+                    <Wallet className="w-3 h-3 text-green-600" />
+                    <span className="text-xs font-medium text-green-800">
+                      {formatBalance(balance)}
                     </span>
                   </div>
                   <button
-                    onClick={disconnect}
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                    onClick={() => {
+                      console.log('🖱️ [HEADER] Disconnect button clicked')
+                      disconnect()
+                    }}
+                    className="inline-flex items-center px-2 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-red-500 to-red-600 border border-transparent rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-sm disabled:opacity-50"
                     disabled={isLoading}
                   >
-                    <LogOut className="w-4 h-4 mr-1" />
-                    Disconnect
+                    <LogOut className="w-3 h-3 mr-1" />
+                    {isLoading && currentOperation === 'disconnect' ? 'Disconnecting...' : 'Disconnect'}
                   </button>
                 </div>
               ) : (
                 <button
-                  onClick={connect}
+                  onClick={() => {
+                    console.log('🖱️ [HEADER] Connect button clicked')
+                    connect('near')
+                  }}
                   className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-600 border border-transparent rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all shadow-sm disabled:opacity-50"
                   disabled={isLoading}
                 >
                   <Wallet className="w-4 h-4 mr-2" />
-                  {isLoading ? 'Connecting...' : 'Connect Wallet'}
+                  {isLoading && currentOperation === 'connect' ? 'Connecting...' : 'Connect NEAR Wallet'}
                 </button>
               )}
             </div>
@@ -186,35 +192,41 @@ export function Header({
             <div className="border-t border-purple-200 pt-4">
               {isConnected ? (
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2 bg-slate-50 rounded-lg px-3 py-2">
-                    <User className="w-4 h-4 text-slate-600" />
-                    <span className="text-sm font-medium text-slate-900">
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg px-3 py-2 border border-purple-200">
+                    <User className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-800">
                       {formatAccountId(accountId)}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2 bg-green-50 rounded-lg px-3 py-2">
+                  <div className="flex items-center space-x-2 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
                     <Wallet className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-900">
+                    <span className="text-sm font-medium text-green-800">
                       {formatBalance(balance)} NEAR
                     </span>
                   </div>
                   <button
-                    onClick={disconnect}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                    onClick={() => {
+                      console.log('🖱️ [HEADER] Mobile disconnect button clicked')
+                      disconnect()
+                    }}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-red-600 border border-transparent rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-sm disabled:opacity-50"
                     disabled={isLoading}
                   >
                     <LogOut className="w-4 h-4 mr-2" />
-                    Disconnect
+                    {isLoading && currentOperation === 'disconnect' ? 'Disconnecting...' : 'Disconnect'}
                   </button>
                 </div>
               ) : (
                 <button
-                  onClick={connect}
+                  onClick={() => {
+                    console.log('🖱️ [HEADER] Mobile connect button clicked')
+                    connect('near')
+                  }}
                   className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-600 border border-transparent rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all shadow-sm disabled:opacity-50"
                   disabled={isLoading}
                 >
                   <Wallet className="w-4 h-4 mr-2" />
-                  {isLoading ? 'Connecting...' : 'Connect Wallet'}
+                  {isLoading && currentOperation === 'connect' ? 'Connecting...' : 'Connect NEAR Wallet'}
                 </button>
               )}
             </div>
