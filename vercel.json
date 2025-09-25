@@ -4,17 +4,5 @@
     "app/api/**/*.ts": {
       "maxDuration": 30
     }
-  },
-  "env": {
-    "NEXT_PUBLIC_GOLEM_PRIVATE_KEY": "@golem_private_key",
-    "NEXT_PUBLIC_GOLEM_ADDRESS": "@golem_address", 
-    "NEXT_PUBLIC_GOLEM_CHAIN_ID": "@golem_chain_id",
-    "NEXT_PUBLIC_GOLEM_RPC_URL": "@golem_rpc_url",
-    "NEXT_PUBLIC_GOLEM_WS_URL": "@golem_ws_url",
-    "NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD": "@default_encryption_password",
-    "OPENAI_API_KEY": "@openai_api_key",
-    "GOOGLE_CLIENT_ID": "@google_client_id",
-    "GOOGLE_CLIENT_SECRET": "@google_client_secret",
-    "NEXT_PUBLIC_APP_URL": "@app_url"
   }
 }

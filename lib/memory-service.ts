@@ -23,8 +23,7 @@ export class MemoryService {
       wsUrl: process.env.NEXT_PUBLIC_GOLEM_WS_URL
     });
     
-    // Initialize key management with default password for basic functionality
-    this.initializeKeyManagement();
+    // Key management will be initialized in the initialize() method
   }
 
   private async initializeKeyManagement(): Promise<void> {
@@ -69,6 +68,9 @@ export class MemoryService {
       console.log('🧠 Initializing Golem storage...');
       
       await this.golemStorage.initialize();
+      
+      // Initialize key management with default password
+      await this.initializeKeyManagement();
       
       // Note: Local index removed - memories are queried directly from Golem Base
       // Note: NEAR wallet removed - using Ethereum wallet for Golem Base only

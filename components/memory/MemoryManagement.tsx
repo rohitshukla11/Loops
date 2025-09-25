@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Search, Trash2, Diamond, Database, Clock, Lock, Unlock, Calendar } from 'lucide-react'
 import { MemoryEntry, MemoryType } from '@/types/memory'
 import { getEncryptionService } from '@/lib/encryption'
+import { getKeyManagementService } from '@/lib/key-management'
 import MemoryToCalendar from '@/components/calendar/MemoryToCalendar'
 
 interface MemoryManagementProps {
@@ -36,7 +37,7 @@ export function MemoryManagement({
     onSearchMemories(searchQuery)
   }
 
-  // Decrypt memory content
+  // Decrypt memory content using the same logic as memory service
   const decryptMemory = async (memory: MemoryEntry) => {
     if (!memory.encrypted || decryptedMemories.has(memory.id)) {
       return
@@ -46,19 +47,51 @@ export function MemoryManagement({
 
     try {
       const encryptionService = getEncryptionService()
-      const keys = encryptionService.getKeys()
+      const keyManagement = getKeyManagementService()
       
-      if (keys.length === 0) {
-        throw new Error('No encryption keys available')
+      // Check if key management is initialized, if not, initialize it
+      if (!keyManagement.isInitialized()) {
+        console.log('🔐 Key management not initialized, initializing with default password...')
+        const defaultPassword = process.env.NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD || 'default-encryption-key-2024'
+        await keyManagement.initializeWithPassword(defaultPassword)
       }
 
       // Parse the encrypted content
       const encryptedData = JSON.parse(memory.content)
       
-      // Try to decrypt with the first available key
-      const result = await encryptionService.decrypt(encryptedData, keys[0].keyId)
+      // Try to get the specific key for this memory
+      const encryptionKeyId = memory.metadata?.encryptionKeyId
+      const encryptionSalt = memory.metadata?.encryptionSalt
       
-      setDecryptedMemories(prev => new Map(prev).set(memory.id, result.content))
+      console.log(`🔍 Memory ${memory.id} metadata:`, {
+        encryptionKeyId: encryptionKeyId || 'NOT_SET',
+        encryptionSalt: encryptionSalt || 'NOT_SET',
+        hasMetadata: !!memory.metadata
+      })
+      
+      let decrypted
+      
+      if (encryptionKeyId) {
+        console.log(`🔐 Decrypting memory ${memory.id} with specific key ${encryptionKeyId}`)
+        const key = keyManagement.getKey(encryptionKeyId)
+        if (key) {
+          decrypted = await encryptionService.decrypt(encryptedData, encryptionKeyId, keyManagement)
+        } else {
+          // Try to regenerate the key from master password using stored salt
+          console.log(`🔄 Regenerating key for memory ${memory.id} from master password`)
+          const storedSalt = memory.metadata?.encryptionSalt
+          const regeneratedKey = await keyManagement.generateMemoryKey(memory.id, storedSalt)
+          decrypted = await encryptionService.decrypt(encryptedData, regeneratedKey.keyId, keyManagement)
+        }
+      } else {
+        // No key ID stored - try to regenerate from master password
+        console.log(`🔄 No key ID stored, regenerating key for memory ${memory.id}`)
+        const storedSalt = memory.metadata?.encryptionSalt
+        const regeneratedKey = await keyManagement.generateMemoryKey(memory.id, storedSalt)
+        decrypted = await encryptionService.decrypt(encryptedData, regeneratedKey.keyId, keyManagement)
+      }
+      
+      setDecryptedMemories(prev => new Map(prev).set(memory.id, decrypted.content))
       setDecryptionStatus(prev => new Map(prev).set(memory.id, 'decrypted'))
     } catch (error) {
       console.warn(`Failed to decrypt memory ${memory.id}:`, error)

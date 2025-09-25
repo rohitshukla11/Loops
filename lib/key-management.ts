@@ -58,13 +58,13 @@ export class KeyManagementService {
     const keyId = `memory_${memoryId}`;
     const memorySalt = salt || this.generateRandomSalt();
     
-    // Derive key from master password + memory ID + salt
+    // Create key material from master password + memory ID + salt
+    // This will be used as the password for PBKDF2 in EncryptionService
     const keyMaterial = `${this.masterKey}_${memoryId}_${memorySalt}`;
-    const derivedKey = await this.deriveKey(keyMaterial, memorySalt);
     
     const encryptionKey: EncryptionKey = {
-      publicKey: derivedKey,
-      privateKey: derivedKey,
+      publicKey: keyMaterial, // Store the key material for encryption
+      privateKey: keyMaterial, // Store the key material for decryption
       keyId: keyId,
       algorithm: 'AES-256-GCM',
       createdAt: new Date(),
@@ -72,7 +72,7 @@ export class KeyManagementService {
     };
 
     this.sessionKeys.set(keyId, encryptionKey);
-    console.log(`🔑 Generated memory-specific key: ${keyId}`);
+    console.log(`🔑 Generated memory-specific key material: ${keyId}`);
     return encryptionKey;
   }
 
@@ -124,23 +124,6 @@ export class KeyManagementService {
     return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
 
-  /**
-   * Derive key using PBKDF2
-   */
-  private async deriveKey(password: string, salt: string): Promise<string> {
-    // This is a simplified version - in production, use a proper PBKDF2 implementation
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + salt);
-    
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hash));
-    const hashString = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    // Double hash for additional security
-    const finalHash = await crypto.subtle.digest('SHA-256', encoder.encode(hashString + salt));
-    const finalArray = Array.from(new Uint8Array(finalHash));
-    return finalArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
 
   /**
    * Generate unique key ID
