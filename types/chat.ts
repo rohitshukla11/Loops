@@ -4,5 +4,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   timestamp: Date;
   memoryId?: string;
-  golemExplorerUrl?: string;
+  golemExplorerUrl?: string; // Legacy field for backward compatibility
+  entityUrl?: string; // Golem Base entity URL
+  transactionUrl?: string; // Golem Base transaction URL
 }

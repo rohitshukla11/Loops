@@ -233,6 +233,32 @@ export function MemoryManagement({
                         : truncateContent(memory.content, 60)
                       }
                     </p>
+                    {(memory.entityUrl || memory.transactionUrl) && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {memory.entityUrl && (
+                          <a
+                            href={memory.entityUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-purple-600 hover:text-purple-800 underline"
+                            title="View entity on Golem DB"
+                          >
+                            🏛️ Entity
+                          </a>
+                        )}
+                        {memory.transactionUrl && (
+                          <a
+                            href={memory.transactionUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            title="View transaction on Golem DB"
+                          >
+                            🔗 TX
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center space-x-1 flex-shrink-0">
                     <button

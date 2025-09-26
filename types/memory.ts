@@ -11,6 +11,8 @@ export interface MemoryEntry {
   metadata: MemoryMetadata;
   ipfsHash?: string;
   nearTransactionId?: string;
+  entityUrl?: string; // Golem Base entity URL
+  transactionUrl?: string; // Golem Base transaction URL
 }
 
 export type MemoryType = 

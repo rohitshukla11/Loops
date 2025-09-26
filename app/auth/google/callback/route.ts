@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
     // Check environment variables
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     const clientSecret = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback';
+    
+    // Determine redirect URI based on environment
+    const isProduction = process.env.NODE_ENV === 'production';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isProduction ? 'https://better-half-ai.vercel.app' : 'http://localhost:3000');
+    const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI || `${baseUrl}/auth/google/callback`;
 
     console.log('Environment variables:', {
       clientId: clientId ? `${clientId.substring(0, 10)}...` : 'missing',

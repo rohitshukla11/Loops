@@ -380,9 +380,14 @@ export class GoogleCalendarClient {
 
 // Factory function to create Google Calendar client
 export function getGoogleCalendarClient(): GoogleCalendarClient {
+  // Determine redirect URI based on environment
+  const isProduction = process.env.NODE_ENV === 'production';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isProduction ? 'https://better-half-ai.vercel.app' : 'http://localhost:3000');
+  const defaultRedirectUri = `${baseUrl}/auth/google/callback`;
+  
   const config: CalendarConfig = {
     clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
-    redirectUri: process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback',
+    redirectUri: process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI || defaultRedirectUri,
     scopes: [
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events'

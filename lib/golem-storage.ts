@@ -543,7 +543,7 @@ export class GolemStorageService {
       // Generate transaction URL for Golem Base
       const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
       const txUrl = `${explorerUrl}/entity/${entityKey}`;
-      console.log(`🔗 Transaction URL: ${txUrl}`);
+      console.log(`🔗 Entity URL: ${txUrl}`);
 
       // Get the storage value directly using the entity key
       const storageValue = await this.client.getStorageValue(entityKey);
@@ -571,6 +571,9 @@ export class GolemStorageService {
         return null;
       }
 
+      // Generate entity URL for the memory
+      const entityUrl = `${explorerUrl}/entity/${entityKey}`;
+      
       // Convert back to MemoryEntry
       const memory: MemoryEntry = {
         id: memoryData.id,
@@ -584,6 +587,8 @@ export class GolemStorageService {
         accessPolicy: memoryData.accessPolicy,
         metadata: memoryData.metadata || {},
         ipfsHash: entityKey, // Store the entity key as ipfsHash for compatibility
+        entityUrl: entityUrl,
+        transactionUrl: memoryData.transactionUrl // This will be set if available from upload
       };
 
       console.log(`✅ Memory retrieved successfully!`);

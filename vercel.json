@@ -1,5 +1,14 @@
 {
-  "version": 2,
+  "env": {
+    "NEXT_PUBLIC_GOOGLE_CLIENT_ID": "@google_client_id",
+    "NEXT_PUBLIC_GOOGLE_CLIENT_SECRET": "@google_client_secret",
+    "NEXT_PUBLIC_GOOGLE_REDIRECT_URI": "@google_redirect_uri",
+    "NEXT_PUBLIC_APP_URL": "@app_url",
+    "NEXT_PUBLIC_GOLEM_PRIVATE_KEY": "@golem_private_key",
+    "NEXT_PUBLIC_GOLEM_ADDRESS": "@golem_address",
+    "NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD": "@encryption_password",
+    "OPENAI_API_KEY": "@openai_api_key"
+  },
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30

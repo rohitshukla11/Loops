@@ -229,6 +229,10 @@ export class MemoryService {
       console.log(`Golem Base Entity Key: ${uploadResult.entityKey}, Size: ${uploadResult.size} bytes`);
       console.log(`Memory Hash: ${memoryHash}`);
       
+      // Generate entity URL
+      const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
+      const entityUrl = `${explorerUrl}/entity/${uploadResult.entityKey}`;
+      
       // Only use transaction URL if present (no entity fallback)
       const transactionUrl = uploadResult.transactionUrl;
       if (!transactionUrl) {
@@ -237,8 +241,11 @@ export class MemoryService {
         console.log(`🔗 Transaction URL: ${transactionUrl}`);
       }
       
+      console.log(`🔗 Entity URL: ${entityUrl}`);
+      
       return {
         ...memory,
+        entityUrl,
         transactionUrl
       };
     } catch (error: any) {

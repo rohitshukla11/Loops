@@ -108,7 +108,9 @@ export class ChatService {
 
       console.log('✅ Chat messages saved to Golem Base with entity key:', uploadResult.entityKey);
       const explorerUrl = process.env.NEXT_PUBLIC_GOLEM_EXPLORER_URL || 'https://explorer.ethwarsaw.holesky.golemdb.io';
-      console.log(`🔗 Transaction URL: ${explorerUrl}/entity/${uploadResult.entityKey}`);
+      const entityUrl = `${explorerUrl}/entity/${uploadResult.entityKey}`;
+      console.log(`🔗 Entity URL: ${entityUrl}`);
+      console.log(`🔗 Transaction URL: ${uploadResult.transactionUrl || 'Not available'}`);
     } catch (error) {
       console.error('Failed to save chat messages:', error);
       throw error;

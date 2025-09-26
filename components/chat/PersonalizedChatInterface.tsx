@@ -256,22 +256,50 @@ export function PersonalizedChatInterface({
                   >
                     {formatTime(message.timestamp)}
                   </p>
-                  {message.golemExplorerUrl && (
+                  {(message.golemExplorerUrl || message.entityUrl || message.transactionUrl) && (
                     <div className="flex flex-col space-y-1">
-                      <a
-                        href={message.golemExplorerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
-                        title="View memory on Golem DB explorer"
-                      >
-                        <span>🔗</span>
-                        <span>
-                          {message.golemExplorerUrl.includes('/tx/') ? 'View TX on Golem DB' : 'View Entity on Golem DB'}
-                        </span>
-                      </a>
+                      {message.entityUrl && (
+                        <a
+                          href={message.entityUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
+                          title="View entity on Golem DB explorer"
+                        >
+                          <span>🏛️</span>
+                          <span>View Entity on Golem DB</span>
+                        </a>
+                      )}
+                      {message.transactionUrl && (
+                        <a
+                          href={message.transactionUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center space-x-1"
+                          title="View transaction on Golem DB explorer"
+                        >
+                          <span>🔗</span>
+                          <span>View TX on Golem DB</span>
+                        </a>
+                      )}
+                      {/* Legacy support */}
+                      {message.golemExplorerUrl && !message.entityUrl && !message.transactionUrl && (
+                        <a
+                          href={message.golemExplorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
+                          title="View on Golem DB explorer"
+                        >
+                          <span>🔗</span>
+                          <span>
+                            {message.golemExplorerUrl.includes('/tx/') ? 'View TX on Golem DB' : 'View Entity on Golem DB'}
+                          </span>
+                        </a>
+                      )}
                       <div className="text-xs text-gray-500">
-                        {(message.golemExplorerUrl.includes('/tx/') ? 'Tx' : 'Key')}: {message.golemExplorerUrl.split('/').pop()?.substring(0, 10)}...
+                        {message.entityUrl && `Entity: ${message.entityUrl.split('/').pop()?.substring(0, 10)}...`}
+                        {message.transactionUrl && ` | TX: ${message.transactionUrl.split('/').pop()?.substring(0, 10)}...`}
                       </div>
                     </div>
                   )}

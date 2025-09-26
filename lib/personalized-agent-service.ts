@@ -620,7 +620,7 @@ Current date and time: ${new Date().toLocaleString()}`;
     return data.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
   }
 
-  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ golemExplorerUrl?: string } | void> {
+  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ golemExplorerUrl?: string; entityUrl?: string; transactionUrl?: string } | void> {
     try {
       // Add delay to prevent overwhelming RPC with rapid requests
       console.log('🧠 Adding delay before learning interaction to prevent RPC overload...');
@@ -638,10 +638,12 @@ Current date and time: ${new Date().toLocaleString()}`;
         encrypted: true
       });
 
-      // Return Golem DB explorer URL if available
-      if (memoryResult && memoryResult.transactionUrl) {
+      // Return Golem DB explorer URLs if available
+      if (memoryResult) {
         return {
-          golemExplorerUrl: memoryResult.transactionUrl
+          golemExplorerUrl: memoryResult.transactionUrl, // Legacy field for backward compatibility
+          entityUrl: memoryResult.entityUrl,
+          transactionUrl: memoryResult.transactionUrl
         };
       }
     } catch (error: any) {

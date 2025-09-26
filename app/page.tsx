@@ -205,7 +205,9 @@ export default function Home() {
         content: data.content,
         role: 'assistant',
         timestamp: new Date(),
-        golemExplorerUrl: data.golemExplorerUrl
+        golemExplorerUrl: data.golemExplorerUrl, // Legacy field for backward compatibility
+        entityUrl: data.entityUrl,
+        transactionUrl: data.transactionUrl
       }
 
       const updatedMessages = [...personalizedMessages, userMessage, assistantMessage]
